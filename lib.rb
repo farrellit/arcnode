@@ -15,6 +15,10 @@ class Pathable
 	
 	attr_reader :id
 	
+	def loaded? 
+		return @loaded
+	end
+	
 	def self.setName 
 		"#{self.name.downcase}".gsub( /([^s])$/, "\\1s" )
 	end
@@ -82,9 +86,9 @@ class Pathable
 		path.each do |p|
 			break unless p; # nil elements break the chain
 			if p.kind_of?(Class) and p <= Pathable
-				urls << " <a class='Class' href='#{p.path_url}'>#{p.text_component}</a> "
+				urls << " <a class='Class #{p.name}' href='#{p.path_url}'>#{p.text_component}</a> "
 			elsif p.kind_of? Pathable
-				urls << " <a class='Instance' href='#{p.path_url}'>#{ p.text_component }</a> "
+				urls << " <a class='Instance #{p.class.name}' href='#{p.path_url}'>#{ p.text_component }</a> "
 			else
 				urls << "<div class='Unknown'>Inspect: <code>" + Rack::Utils.escape_html(p.inspect) + "</code> <code><b>#{p.class.name}</b></code></div>"
 			end
@@ -103,13 +107,9 @@ end
 
 class Item < Pathable # Node or Arc
 	
-	
-	def loaded? 
-		return @loaded
-	end
-
 	def initialize id
 		@loaded = false
+		@data = [] 
 		load_data id
 	end
 	
@@ -131,6 +131,10 @@ class Item < Pathable # Node or Arc
 		@data[param]
 	end
 
+	def to_h 
+		return @data
+	end
+
 	def param_smembers key, redis_key, type
 		itemset = type.new
 		itemset.set_name = redis_key
@@ -143,15 +147,15 @@ class Item < Pathable # Node or Arc
 		#$log.debug "#{self.class.name}::#{__method__} : loaded key #{key} / redis #{redis_key}: #{ @data[key].inspect.yellow }"
 	end
 	def get_data_key 
-		return "#{self.class.name}:#{@id||'unbound'}"
+		return "#{self.class.setName}_#{@id||'unbound'}"
 	end
-
 
 	def link_url
-		"/#{self.class.setName}/#{@id}"
+		path_url
 	end
+
 	def link_text 
-		"<a href='#{link_url}'><b>#{self.class.name} id #{@id} </b></a> #{link_extra}"
+		"<a class='#{self.class.name} Instance' href='#{link_url}'><b>#{self.class.name} id #{@id}</b></a> #{link_extra}"
 	end
 	def link_extra 
 		"<small><code>#{ Rack::Utils.escape_html(self.inspect)}"
@@ -161,8 +165,16 @@ end
 class Node < Item
 	def link_extra
 		arcs = ""
-		@data['arcs'].each{ |id,arc| arcs << " <a href='#{arc.link_url}'>#{id}</a> " }
-		"Connected by arcs: #{arcs}"
+		acount = 0
+		@data['arcs'].each{ |id,arc| 
+			arcs << " <a class='Arc' href='#{arc.link_url}'>#{id}</a>"
+			acount += 1
+			if acount > 9 and acount < ( @data['arcs'].count - 1 )
+				arcs << "<a href='#{@data['arcs'].path_url}' class='Arcs'>&hellip;</a> "
+				break
+			end 
+		}
+		"Connected by <a class='Arc' href='#{@data['arcs'].path_url}'>#{@data['arcs'].count} Arcs</a>: #{arcs}"
 	end
 	def load_data id
 		super

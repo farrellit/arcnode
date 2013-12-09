@@ -1,37 +1,59 @@
 body {
-	font-family: "Courier New", courier, times;
+	/* font-family: "Courier New", courier, times; */
+	font-family: serif;
 }
 
-
-body > div.Item {
-	default-background-color: #ccc;
-	border: solid 1px;
-	margin: 7px;
-	padding: 3px;
+body  div.Item {
+	margin: 3px;
+	padding: 13px;
 }
 div.Arc {
 	background-color: #eeeeee;
-	border-color: #ddd;
+	border-left: dotted 3px #9f7;
+	background-color: #f3ffef;
 }
 div.Node {
-	background-color: #eeeeee;
-	border-color: #ddd;
+	border-left: dotted 3px #f97;
+	background-color: #fff3ef;
 }
 
-div.Item > h3  {
-	background-color: #aaa;
+body  div.Item > h3  {
 	color:white;
-	border-bottom: dotted 1px black;
+	Xborder-bottom-style: dotted;
 	padding: 4px;
-	margin: -3px;
-}
-div.Node > h3 {
-	background-color: #d33;
-}
-div.Arc > h3 {
-	background-color: #3d3;
+	margin: -13px;
 }
 
+a.Class, a.Instance,
+a.Class:visited, a.Instance:visited
+{ 
+	border-bottom-style: dotted;
+	border-bottom-width: 3px;
+}
+a.Class:active, a.Instance:active{
+	color: red
+}
+
+a.Class:hover, a.Instance:hover
+{
+	color: blue;
+}
+body div.Node > h3 {
+	xborder-bottom: dotted 3px #f97;
+	background-color: #ffe9e1;
+}
+
+a.Node, a.Nodes {
+	border-bottom-color: #f97;
+}
+div.Arc > h3{
+	xborder-bottom: dotted 3px #9f7;
+	background-color: #e9ffe1;
+}
+
+a.Arc, a.Arcs {
+	border-bottom-color: #9f7;
+}
 
 code, pre {
 	color: #54ce22;
@@ -50,7 +72,7 @@ pre {
 div.path {
 	margin: 3px;
 	padding: 3px;
-	background-color: #ccc;
+	background-color: #aaa;
 	border: solid 1px black;
 	display: none
 }
@@ -63,3 +85,17 @@ h1{
 div.columns { display: table }
 div.columns div.row { display: table-row }
 div.columns div.row div.cell { display: table-cell }
+
+dt {
+	font-style: italic;
+	font-weight: bold;
+	line-height: 1.4;
+	margin-top: 3px;
+	margin-left: 3px;
+}
+dd {
+	margin-bottom: 3px;
+	margin-left: 1.1em;
+	padding-left: .2em;
+	border-left: dotted 1px;
+}

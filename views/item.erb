@@ -9,24 +9,32 @@
 <% 
 
 
-unless item
+unless item.loaded?
 	%><p><em>item is not bound to data </em> ( id: <code><%=id%></code>, item: <code<%= item.inspect %></code> ) </p><%
 else
 	['nodes','arcs'].each do |key|
 		next unless item[key]
-		%><h4><a href='<%= "/#{item.class.setName}/#{item.id}/#{key}" %>'><%= key %></a></h4>
-		<% if item[key].kind_of? Pathable %>
-			<p><%= item[key].path_html %></p>
+		if item[key].kind_of? Pathable %>
+			<h4><%= item[key].path_html %></h4>
+		<% else %>
+			<h4><%= key %></h4>
 		<% end %>
-		<pre style='display:none'><%= item[key].inspect %></pre>
-		<ul>
-		<% item[key].each do |ref,item| %>
-			<li>
-				<a href='<%= "/#{key}/#{ref}" %>' ><%= item.link_text %></a>
-			</li>
-		<% end %>
+			<ul>
+			<% item[key].each do |ref,item| %>
+				<li>
+					<a class='Instance <%= item.class.name %>' href='<%= "#{item.path_url}" %>' ><%= item.link_text %></a>
+				</li>
+			<% end %>
 		</ul>
+	<% end 
+	%><h4>Other Parameters</h4>
+	<dl>
+	<% item.to_h.each do |key,val|
+		next if ['nodes','arcs'].include? key
+		%><dt><%= key %></dt>
+		<dd><%= val.to_s %></dd>
 	<% end %>
+  </dl>
 <% end %>
 </div>
 
