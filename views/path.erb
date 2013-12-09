@@ -1,0 +1,17 @@
+<%
+urls= [ ]
+path.each do |p|
+	break unless p; # nil elements break the chain
+	if p.kind_of?(Class) and p <= Pathable
+		urls << " <a href='#{p.path_url}'>#{p.text_component}</a> "
+	elsif p.kind_of? Pathable
+		urls << " <a href='#{p.path_url}'>#{ p.text_component }</a> "
+	else
+		urls << ( 
+			"Inspect:" 
+			+ "<code><b>#{p.class.name}</b></code> " 
+			+ "<code>" + Rack::Utils.escape_html(p.inspect) +"</code>"
+			)
+	end
+end %>
+<a class='indexlink' href='/'>/</a> <%= urls.join "/" %>

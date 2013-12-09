@@ -1,0 +1,33 @@
+<% if subtitle %>
+<h2><%= subtitle %></h2>
+<% end %>
+<div class='<%= item.class.name%> Item '>
+<h3>
+	<%= item.path_html %>
+</h3>
+<%= Erubis::Eruby.new( File.read( 'views/pathinfo.erb') ).result( :pathable=>item) %>
+<% 
+
+
+unless item
+	%><p><em>item is not bound to data </em> ( id: <code><%=id%></code>, item: <code<%= item.inspect %></code> ) </p><%
+else
+	['nodes','arcs'].each do |key|
+		next unless item[key]
+		%><h4><a href='<%= "/#{item.class.setName}/#{item.id}/#{key}" %>'><%= key %></a></h4>
+		<% if item[key].kind_of? Pathable %>
+			<p><%= item[key].path_html %></p>
+		<% end %>
+		<pre style='display:none'><%= item[key].inspect %></pre>
+		<ul>
+		<% item[key].each do |ref,item| %>
+			<li>
+				<a href='<%= "/#{key}/#{ref}" %>' ><%= item.link_text %></a>
+			</li>
+		<% end %>
+		</ul>
+	<% end %>
+<% end %>
+</div>
+
+

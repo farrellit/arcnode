@@ -1,0 +1,18 @@
+<div class='path'>
+<h4>Path Info</h4>
+<pre>
+<%= pathable.inspect %>
+</pre>
+<p><b>URL:</b> <input value='<%= pathable.url_component %>'></p>
+<p><b>Path URL:</b> <input value='<%= pathable.path_url %>'></p>
+<p><b>Path:</b> 
+<ol>
+<% 
+pathable.path.each do |p|
+	%><li><code><%= p.class.name %></code>
+		<pre><%= p.inspect %></pre>
+	</li>
+<% end %>
+</ol>
+</p>
+</div>

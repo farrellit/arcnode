@@ -1,0 +1,15 @@
+<h1>Arcs and Nodes</h1>
+<h2>Arcs</h2>
+<% arcs.each do |id,arc|
+	%>
+	<div class='arc'>
+	<h3>Arc <%= id %></h3>
+	<code><pre><%= arc.inspect %></pre></code>
+	<h4>Nodes</h4>
+	<ul>
+	<% arc['nodes'].each do |node| %>
+		<li><a href='/nodes/<%= node %>' ><%= node %></a></li>
+	<% end %>
+	</ul>
+	</div>
+<% end %>

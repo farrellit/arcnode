@@ -1,0 +1,21 @@
+<h3><%= "#{item.class.name} #{id}" %></h3>
+<% 
+unless item
+		puts "<p><em>item is not bound to data</em></p>"
+else	
+	['nodes','arcs'].each do |key|
+		next unless item[key]
+		%><h4><%= key %></h4>
+		<p><kbd><%= h item[key].inspect %></kbd></p>
+		<ul>
+		<% item[key].each do |id,ref| %>
+			<li>
+				<a href='<%= "/#{key}/#{id}" %>' ><%= ref %></a>
+			</li>
+		<% end %>
+		</ul>
+	<% end %>
+	</div>
+<% end %>
+
+<% end %>

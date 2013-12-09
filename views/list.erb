@@ -1,0 +1,25 @@
+<% 
+cancel=false
+begin %>
+<h2><%= items.path_html %></h2>
+<% rescue Exception => e 
+	cancel=true
+%>
+<p><strong>Error!  Couldn't generate path html.</strong></p>
+<p>
+<code><i><%= e.class.name %> </i> <%= e.message %>  <code>
+</p>
+<pre><%= e.backtrace.join "\n" %> <pre>
+<%= items.inspect %>
+</pre>
+<%
+end
+unless cancel
+%>
+<%= Erubis::Eruby.new( File.read( 'views/pathinfo.erb') ).result( :pathable=>items ) %>
+<p>Showing <kbd><%= items.count %></kbd> members of set <kbd><%= items.set_name %></kbd>.</p>
+<%
+items.each do |id,item|
+	%><%= Erubis::Eruby.new( File.read( 'views/item.erb') ).result( {:id=> id, :item=>item, :subtitle => nil } ) %>
+<% end %>
+<% end %>

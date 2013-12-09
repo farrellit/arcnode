@@ -1,0 +1,43 @@
+<% 
+cancel=false
+begin %>
+<h2><%= items.subtitle %></h2>
+<% rescue Exception => e 
+	cancel=true
+ensure %>
+<pre>
+<%= h items.inspect %>
+</pre>
+<%
+end
+unless cancel
+
+items.each do |id,item|
+	%>
+	<div class='<%= item.class.name%>'>
+	<h3><%= "#{item.class.name} #{id}" %></h3>
+	<!--<p><code><pre><%= h item.inspect %></pre></code></p>-->
+	<% 
+	unless item
+		puts "<p><em>item is not bound to data</em></p>"
+		next 
+	end
+	['nodes','arcs'].each do |key|
+		unless item[key]
+			%><!-- <p>doesn't have <kbd>[<%=key%>]</kbd></p>--><%
+			next
+		end
+		%><h4><%= key %></h4>
+		<p><kbd><%= h item[key].inspect %></kbd></p>
+		<ul>
+		<% item[key].each do |ref| %>
+			<li>
+				<a href='<%= "/#{key}/#{ref}" %>' ><%= ref %></a>
+			</li>
+		<% end %>
+		</ul>
+	<% end %>
+	</div>
+<% end %>
+
+<% end %>

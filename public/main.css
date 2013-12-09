@@ -1,0 +1,65 @@
+body {
+	font-family: "Courier New", courier, times;
+}
+
+
+body > div.Item {
+	default-background-color: #ccc;
+	border: solid 1px;
+	margin: 7px;
+	padding: 3px;
+}
+div.Arc {
+	background-color: #eeeeee;
+	border-color: #ddd;
+}
+div.Node {
+	background-color: #eeeeee;
+	border-color: #ddd;
+}
+
+div.Item > h3  {
+	background-color: #aaa;
+	color:white;
+	border-bottom: dotted 1px black;
+	padding: 4px;
+	margin: -3px;
+}
+div.Node > h3 {
+	background-color: #d33;
+}
+div.Arc > h3 {
+	background-color: #3d3;
+}
+
+
+code, pre {
+	color: #54ce22;
+}
+
+pre {
+	background-color: #eee;
+	border: dotted 1px #777;
+	margin: 9px;
+	padding: 3px;
+	display: block;
+	white-space: pre-wrap;
+
+}
+
+div.path {
+	margin: 3px;
+	padding: 3px;
+	background-color: #ccc;
+	border: solid 1px black;
+	display: none
+}
+
+h1{
+	border-bottom: solid 1px black;
+	text-align: right;
+}
+
+div.columns { display: table }
+div.columns div.row { display: table-row }
+div.columns div.row div.cell { display: table-cell }
