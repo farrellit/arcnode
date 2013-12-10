@@ -145,7 +145,7 @@ tools.arcnode.create = function ( opts )
 	end
 	for rel,ifunc in pairs( config.each_indices ) do
 		assert( type(opts[rel] ) == 'table', "config.each_indexes entry '"..rel.."' missing from opts" )
-		for other in pairs( opts[rel] ) do 
+		for i,other in pairs( opts[rel] ) do 
 			tools.index.cross( { 
 				{ index=ifunc(id), value=id },
 				{ index=tools[rel].config.each_indices[config.name](other), value=other }
