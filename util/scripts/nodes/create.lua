@@ -1,1 +1,1 @@
-return tools.arcs.create( { } )
+return tools.nodes.create( { arcs={} } )

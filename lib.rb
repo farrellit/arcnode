@@ -139,12 +139,8 @@ class Item < Pathable # Node or Arc
 		itemset = type.new
 		itemset.set_name = redis_key
 		itemset.path = self.path 
-		#$log.debug "Loading all...".red
 		itemset.loadAll
-		#$log.debug "Saving itemset under ['#{key}']...".red
 		@data[key] = itemset
-		#$log.debug "done loading all".red
-		#$log.debug "#{self.class.name}::#{__method__} : loaded key #{key} / redis #{redis_key}: #{ @data[key].inspect.yellow }"
 	end
 	def get_data_key 
 		return "#{self.class.setName}_#{@id||'unbound'}"

@@ -23,8 +23,7 @@ local function showtable( tbl )
 		end
 	end
 	msg = msg .. "}"
-	notice( count .. " => " .. msg )
-	return "SHOWTABLE: " .. msg 
+	return msg 
 end
 
 local tools={}
@@ -93,7 +92,7 @@ tools.index.cross = function ( opts )
 		assert( not(type(opts[i]['index']) == "nil"), badinput_msg("opts["..i.."]['index'] must be of type string") )
 		assert( not(type(opts[i]['value']) ==  "nil"), badinput_msg("opts["..i.."]['value'] must be of type string") )
 	end
-	
+	log( "tools.index.cross : crossing: " .. showtable( opts )) 
 	redis.call( 'sadd', opts[1]['index'], opts[2]['value'] )
 	redis.call( 'sadd', opts[2]['index'], opts[1]['value'] )
 	
@@ -108,7 +107,7 @@ tools.arcs.config = {
 	name="arcs",
 	index="arcs",
 	each_indices = { 
-		nodes=function (id) return "arc_"..id.."nodes" end
+		nodes=function (id) return "arcs_"..id.."_nodes" end
 	},
 	each_templates= {
 		id={ 
@@ -148,8 +147,8 @@ tools.arcnode.create = function ( opts )
 		assert( type(opts[rel] ) == 'table', "config.each_indexes entry '"..rel.."' missing from opts" )
 		for other in pairs( opts[rel] ) do 
 			tools.index.cross( { 
-				{ index=ifunc(id), value=other },
-				{ index=tools[rel].config.each_indices[config.name](id), value=id }
+				{ index=ifunc(id), value=id },
+				{ index=tools[rel].config.each_indices[config.name](other), value=other }
 			} )
 		end
 	end
@@ -181,7 +180,7 @@ tools.nodes.config = {
 	name="nodes",
 	index="nodes",
 	each_indices = { 
-		arcs=function (id) assert( not ( id == nil ), "id Cannot be NIL".. debug.traceback()  ); return "node_"..id.."arcs" end
+		arcs=function (id) assert( not ( id == nil ), "id Cannot be NIL".. debug.traceback()  ); return "nodes_"..id.."_arcs" end
 	},
 	each_templates= {
 		id={ 
@@ -193,7 +192,6 @@ tools.nodes.config = {
 
 tools.nodes.exists = function ( opts )
 	assert( type(opts) == 'table', "tools.nodes.exists: opts must be table" )
-	notice( "Type of opts['node'] : " .. type(opts['node'] ) )
 	assert( not ( type(opts['node']) == 'nil' ) , "tools.nodes.exists: opts['node'] must be set" )
 	return tools.index.exists( { index=tools.nodes.config.index , value=opts['node'] } )
 end
@@ -201,6 +199,6 @@ end
 tools.nodes.create = function ( opts )
 	assert( type(opts) == 'table', 
 		"tools.nodes.create: opts must be table" )
-	opts.config = tools.arcs.config
+	opts.config = tools.nodes.config
 	return tools.arcnode.create( opts )
 end
