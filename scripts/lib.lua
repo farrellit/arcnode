@@ -170,6 +170,18 @@ tools.arcs.create = function ( opts )
 	end
 	assert( not( opts.nodes[1] == opts.nodes[2] ), 
 		"tools.arcs.create: nodes must be different, not just {1=#"..opts.nodes[1]..",2="..opts.nodes[2].."}" )
+	for i,k in pairs( redis.call( 'smembers', tools.nodes.config.each_indices.arcs( opts.nodes[1])) ) do
+		assert( 0 == redis.call('sismember', tools.nodes.config.each_indices.arcs( opts.nodes[2] ), k), 
+			" Arc " .. k .. " already joins  " .. 
+				showtable(redis.call('smembers', tools.arcs.config.each_indices.nodes( k ) ) ) 
+			.. " options are: " .. opts.nodes[1] .. " and ".. opts.nodes[2] .. "\n" .. 
+			  "found in " .. tools.nodes.config.each_indices.arcs( opts.nodes[1] ) ..  " " 
+			  .. showtable(redis.call( 'smembers', tools.nodes.config.each_indices.arcs( opts.nodes[1])) )
+			  .. " \n and \n" .. tools.nodes.config.each_indices.arcs( opts.nodes[2] ) ..  " " 
+			  .. showtable( redis.call('smembers', tools.nodes.config.each_indices.arcs( opts.nodes[2] ) ) ) 
+			)
+		
+	end
 	opts.config = tools.arcs.config
 	return tools.arcnode.create( opts )
 end
