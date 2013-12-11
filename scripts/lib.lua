@@ -3,6 +3,17 @@ local function log (msg)
 	redis.log( redis.LOG_NOTICE, msg )
 end
 
+local function type_assert ( var, target_type, msg, neg )
+	if type(msg) == "nil" then
+		msg = "Wrong type ("..type(msg) .. ") : expected " .. target_type .. " in: \n"..debug.traceback() 
+	end
+	if neg then
+		assert( not( type(var) == target_type), msg )
+	else
+		assert( type(var) == target_type,  msg )
+	end
+end
+
 local function notice (msg) 
 	redis.log( redis.LOG_NOTICE, debug.traceback() .. "\n" .. msg )
 end
@@ -49,6 +60,12 @@ tools.index.next_id = function ( opts )
 	return i
 end
 
+tools.index.all = function( opts )
+	type_assert( opts, 'table' )
+	type_assert( opts.index, 'nil', nil, true )
+	return redis.call( 'SMEMBERS', opts.index )
+end
+
 tools.index.add = function ( opts )
 	local function badinput_msg (submsg ) 
 		return "Bad input to index.add : ".. submsg 
@@ -77,6 +94,13 @@ tools.index.exists = function ( opts )
 	return ret
 end	
 
+tools.index.del = function ( opts )
+	assert( type(opts) == 'table', "tools.index.del - opts must be of type table " .. debug.traceback() ) 
+	assert( not(type(opts['index']) == "nil"), "opts['index'] must be defined" )
+	assert( not(type(opts['value']) ==  "nil"), "opts['value'] must be defined" )
+	local ret = true
+	return tonumber( redis.call( "SREM", opts['index'], opts['value'] ) )
+end
 
 tools.index.cross = function ( opts )
 	local function badinput_msg (submsg ) 
@@ -95,7 +119,19 @@ tools.index.cross = function ( opts )
 	log( "tools.index.cross : crossing: " .. showtable( opts )) 
 	redis.call( 'sadd', opts[1]['index'], opts[2]['value'] )
 	redis.call( 'sadd', opts[2]['index'], opts[1]['value'] )
-	
+	return true
+end
+
+tools.index.uncross = function ( opts ) 
+	assert( type(opts) == 'table', "tools.index.uncross - opts must be of type table " .. debug.traceback() ) 
+	for i in pairs({ 1, 2 }) do
+		assert( type(opts[i]) == "table", "opts["..i.."] must be of type table"  )
+		assert( not(type(opts[i]['index']) == "nil"), "opts["..i.."]['index'] must be of type string" )
+		assert( not(type(opts[i]['value']) ==  "nil"), "opts["..i.."]['value'] must be of type string" )
+	end
+	log( "tools.index.cross : uncrossing: " .. showtable( opts ) ) 
+	redis.call( 'SREM', opts[1]['index'], opts[2]['value'] )
+	redis.call( 'SREM', opts[2]['index'], opts[1]['value'] )
 	return true
 end
 
@@ -123,8 +159,8 @@ tools.arcs.config = {
 
 tools.arcs.exists = function ( opts )
 	assert( type(opts) == 'table', "tools.arcs.exists: opts must be table" )
-	assert( not(type(opts['arc']) == 'nil'), "tools.arcs.exists: opts['arc'] must be set" )
-	return tools.index.exists( { index=tools.arcs.config.index , value=opts['arc'] } )
+	assert( not(type(opts['id']) == 'nil'), "tools.arcs.exists: opts['id'] must be set" )
+	return tools.index.exists( { index=tools.arcs.config.index , value=opts['id'] } )
 end
 
 tools.arcnode.create = function ( opts )
@@ -157,6 +193,42 @@ tools.arcnode.create = function ( opts )
 	return id
 end
 
+tools.logdel =function( key ) 
+	log( "delete " .. key )
+	redis.call( "DEL",  key )
+end
+
+tools.arcnode.std_assert = function( opts )
+	type_assert( opts, 'table')
+	type_assert( opts.id, 'nil', nil, true )
+end
+
+tools.arcnode.delete = function( opts )
+	type_assert( opts.config, 'table')
+	local tool = tools[opts.config.name]
+	type_assert( tool, "table" , "Could not find tool for " .. opts.config.name .. " in tools.arcnode.create " )
+	local t = {}
+	assert( tool.exists( {id=opts.id} ), 
+		"Does not exist: " .. opts.config.name .. " id " 
+			..  opts.id 
+		)
+	tools.index.del( { index=opts.config.index, value=opts.id } )
+	for rel,ifunc in pairs( opts.config.each_indices ) do
+		for i,other in pairs( tools.index.all( {index=ifunc(opts.id)} ) ) do
+			tools.index.uncross( { 
+				{ index=ifunc(opts.id), value=opts.id },
+				{ index=tools[rel].config.each_indices[opts.config.name](other), value=other }
+			} )
+		end
+		tools.logdel( ifunc(opts.id) )
+	end
+	for i,tpl in pairs(opts.config.each_templates) do
+		tools.logdel( tpl.genname( opts.id ) )
+	end
+	return opts.id
+end
+	
+
 tools.arcs.create = function ( opts )
 	assert( type(opts) == 'table', 
 		"tools.arcs.create: opts must be table" )
@@ -166,7 +238,7 @@ tools.arcs.create = function ( opts )
 		"tools.arcs.create: opts['nodes'] must contain 2 node IDs " )
 	for i in pairs({ 1, 2}) do 
 		local n={ 1,2,3 }
-		assert(tools.nodes.exists( { t=n, node=opts.nodes[i] } ), "node does not exist: " .. opts.nodes[i] )
+		assert(tools.nodes.exists( { t=n, id=opts.nodes[i] } ), "node does not exist: " .. opts.nodes[i] )
 	end
 	assert( not( opts.nodes[1] == opts.nodes[2] ), 
 		"tools.arcs.create: nodes must be different, not just {1=#"..opts.nodes[1]..",2="..opts.nodes[2].."}" )
@@ -184,6 +256,12 @@ tools.arcs.create = function ( opts )
 	end
 	opts.config = tools.arcs.config
 	return tools.arcnode.create( opts )
+end
+
+tools.arcs.delete = function ( opts )
+	type_assert( opts, "table")
+	type_assert( opts.id, "nil", nil, true)
+	return tools.arcnode.delete( { id=opts.id, config=tools.arcs.config } )
 end
 
 tools.nodes = {}
@@ -204,8 +282,8 @@ tools.nodes.config = {
 
 tools.nodes.exists = function ( opts )
 	assert( type(opts) == 'table', "tools.nodes.exists: opts must be table" )
-	assert( not ( type(opts['node']) == 'nil' ) , "tools.nodes.exists: opts['node'] must be set" )
-	return tools.index.exists( { index=tools.nodes.config.index , value=opts['node'] } )
+	assert( not ( type(opts['id']) == 'nil' ) , "tools.nodes.exists: opts['id'] must be set" )
+	return tools.index.exists( { index=tools.nodes.config.index , value=opts['id'] } )
 end
 
 tools.nodes.create = function ( opts )
@@ -213,4 +291,14 @@ tools.nodes.create = function ( opts )
 		"tools.nodes.create: opts must be table" )
 	opts.config = tools.nodes.config
 	return tools.arcnode.create( opts )
+end
+
+tools.nodes.delete = function ( opts )
+	type_assert( opts, "table")
+	type_assert( opts.id, "nil", nil, true)
+	for i,v in pairs( redis.call( "SMEMBERS", tools.nodes.config.each_indices.arcs(opts.id)  ) ) do
+		assert( not( tools.arcs.exists( {id=v}) ), 
+			"Cannot delete node " .. opts.id .. " : connected by arc " .. v )
+	end
+	return tools.arcnode.delete( { id=opts.id, config=tools.nodes.config } )
 end
