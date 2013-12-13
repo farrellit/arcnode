@@ -4,8 +4,14 @@ local function log (msg)
 end
 
 local function type_assert ( var, target_type, msg, neg )
-	if type(msg) == "nil" then
-		msg = "Wrong type ("..type(msg) .. ") : expected " .. target_type .. " in: \n"..debug.traceback() 
+	if not msg then
+		local type_message
+		if neg then
+			type_message = "not " .. target_type
+		else
+			type_message = target_type
+		end
+		msg = "Wrong type ("..type(msg) .. ") : expected " .. type_message .. " in: \n"..debug.traceback() 
 	end
 	if neg then
 		assert( not( type(var) == target_type), msg )
@@ -282,7 +288,7 @@ tools.nodes.config = {
 
 tools.nodes.exists = function ( opts )
 	assert( type(opts) == 'table', "tools.nodes.exists: opts must be table" )
-	assert( not ( type(opts['id']) == 'nil' ) , "tools.nodes.exists: opts['id'] must be set" )
+	type_assert( opts['id'], 'nil', nil, true )
 	return tools.index.exists( { index=tools.nodes.config.index , value=opts['id'] } )
 end
 
