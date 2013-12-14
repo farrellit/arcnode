@@ -1,8 +1,11 @@
-
+--[[
 local function log (msg) 
 	redis.log( redis.LOG_NOTICE, msg )
 end
-
+local function notice (msg) 
+	redis.log( redis.LOG_NOTICE, debug.traceback() .. "\n" .. msg )
+end
+--]]
 local function type_assert ( var, target_type, msg, neg )
 	if not msg then
 		local type_message
@@ -18,10 +21,6 @@ local function type_assert ( var, target_type, msg, neg )
 	else
 		assert( type(var) == target_type,  msg )
 	end
-end
-
-local function notice (msg) 
-	redis.log( redis.LOG_NOTICE, debug.traceback() .. "\n" .. msg )
 end
 
 local function showtable( tbl )
@@ -57,9 +56,10 @@ tools.index.next_id = function ( opts )
 	while i == 0  do
 		i = tonumber( redis.call( "INCR", opts['counter'] ) )
 		if tools.index.exists( { index=opts['index'], value=i} ) then
-			notice( "\"Unused\" ID ".. i  .. " from " .. opts['counter'] 
+			--[[notice( "\"Unused\" ID ".. i  .. " from " .. opts['counter'] 
 				.. " already existed in " .. opts['index'] 
 				.. " : choosing another " )
+			--]]
 			i = 0
 		end
 	end
@@ -122,7 +122,7 @@ tools.index.cross = function ( opts )
 		assert( not(type(opts[i]['index']) == "nil"), badinput_msg("opts["..i.."]['index'] must be of type string") )
 		assert( not(type(opts[i]['value']) ==  "nil"), badinput_msg("opts["..i.."]['value'] must be of type string") )
 	end
-	log( "tools.index.cross : crossing: " .. showtable( opts )) 
+	--log( "tools.index.cross : crossing: " .. showtable( opts )) 
 	redis.call( 'sadd', opts[1]['index'], opts[2]['value'] )
 	redis.call( 'sadd', opts[2]['index'], opts[1]['value'] )
 	return true
@@ -135,7 +135,7 @@ tools.index.uncross = function ( opts )
 		assert( not(type(opts[i]['index']) == "nil"), "opts["..i.."]['index'] must be of type string" )
 		assert( not(type(opts[i]['value']) ==  "nil"), "opts["..i.."]['value'] must be of type string" )
 	end
-	log( "tools.index.cross : uncrossing: " .. showtable( opts ) ) 
+	--log( "tools.index.cross : uncrossing: " .. showtable( opts ) ) 
 	redis.call( 'SREM', opts[1]['index'], opts[2]['value'] )
 	redis.call( 'SREM', opts[2]['index'], opts[1]['value'] )
 	return true
@@ -177,8 +177,8 @@ tools.arcnode.create = function ( opts )
 	local config = opts.config
 	local id = tools.index.next_id( { index=config.index } )
 	assert( not (type(id) == nil), "Failed to gain an ID!" )
-	log( "Type of id is " .. type(id) )
-	log( "New id for " .. opts.config.name .. " is " .. id )
+	--log( "Type of id is " .. type(id) )
+	--log( "New id for " .. opts.config.name .. " is " .. id )
 	for i,tpl in pairs(config.each_templates) do
 		local tplname=tpl.genname( id )
 		for attr,value in pairs(tpl.attributes) do
@@ -198,12 +198,12 @@ tools.arcnode.create = function ( opts )
 	redis.call( 'HSET', config.each_templates.id.genname( id ), 'id', id)
 	return id
 end
-
+--[[
 tools.logdel =function( key ) 
 	log( "delete " .. key )
 	redis.call( "DEL",  key )
 end
-
+--]]
 tools.arcnode.std_assert = function( opts )
 	type_assert( opts, 'table')
 	type_assert( opts.id, 'nil', nil, true )
@@ -226,10 +226,10 @@ tools.arcnode.delete = function( opts )
 				{ index=tools[rel].config.each_indices[opts.config.name](other), value=other }
 			} )
 		end
-		tools.logdel( ifunc(opts.id) )
+		--tools.logdel( ifunc(opts.id) )
 	end
 	for i,tpl in pairs(opts.config.each_templates) do
-		tools.logdel( tpl.genname( opts.id ) )
+		--tools.logdel( tpl.genname( opts.id ) )
 	end
 	return opts.id
 end
