@@ -1,3 +1,5 @@
+#!/usr/bin/ruby
+#
 require 'sinatra'
 require './lib.rb' 
 
