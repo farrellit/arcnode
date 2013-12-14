@@ -1,7 +1,8 @@
 #!/usr/bin/ruby
 #
 require 'sinatra'
-require './lib.rb' 
+require './lib/expcache/expcache.rb'
+require './lib/arcnode.rb' 
 
 helpers do
 	def h(text)
