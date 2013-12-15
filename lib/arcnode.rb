@@ -194,8 +194,15 @@ end
 class Thing < Item
 	def link_extra
 		nodes = ""
-		@data['nodes'].each{ |id,node| nodes << " <a href='#{node.link_url}'>#{id}</a> " }
+		@data['nodes'].each{ |id,node| 
+			nodes << " <a href='#{node.link_url}'>#{id}</a> "
+			nodes << "Move Through: " if node['arcs'].count > 0
+			node['arcs'].each{ |id,arc|
+				nodes << " <a href='#' onclick='moveThing(\"#{@id}\",\"#{id}\");return false'>arc #{id}</a>"
+			}
+		}
 		"Habitating Node: #{nodes}"
+
 	end
 	def load_data id
 		super
@@ -304,26 +311,3 @@ class Arcs < ItemSet
 end
 
 
-=begin
-
-def get_arcs
-	arc_keys = $r.smembers "arcs"
-	arcs={}
-	arc_keys.each do |id|
-		arcs[id] = $r.hgetall "arcs_#{id}"
-		arcs[id]['nodes'] = $r.smembers "arcs_#{id}_nodes"
-	end
-	arcs
-end
-
-def get_nodes
-	node_keys = $r.smembers "nodes"
-	nodes={}
-	node_keys.each do |id|
-		nodes[id] = $r.hgetall "nodes_#{id}"
-		nodes[id]['arcs'] = $r.smembers "nodes_#{id}_arcs"
-	end
-	nodes
-end
-
-=end

@@ -1,6 +1,8 @@
 #!/usr/bin/ruby
 #
+require 'rubygems'
 require 'sinatra'
+require 'json'
 require './lib/arcnode.rb' 
 
 helpers do
@@ -90,6 +92,20 @@ get "/nodes/:id/things" do
 	end
 end
 
+put "/arcs/:id/transfer/:thing" do
+	r = Redis.new
+	r.select 1
+	sha=r['things.move']
+	begin
+		newnode = r.evalsha sha, [], [ params[:thing].to_i, params[:id].to_i ]
+		redirect "/nodes/#{newnode}", 303
+		"Thing moved to node #{newnode}"
+	rescue Exception=>e 
+		status 500
+		"#{e.class.name}: #{e.message}.  #{e.backtrace.join ", " } "
+	end
+end
+
 get "/arcs/:id/nodes" do
 	n = Arc.new(params[:id])
 	if n.loaded?
@@ -125,12 +141,15 @@ get "/things/:id/nodes" do
 		main_erb( item_erb( js ? n.to_h : n ) )
 	end
 end
-get "/things/:id" do
-	main_erb item_erb(params[:id], Thing)
+get %r{/things/(\d+)$} do
+	id = params[:captures][0]
+	main_erb item_erb(id, Thing)
 end
 
-get "/things" do
-	main_erb erb( :list, :locals => { :items=>Things.new.loadAll } )
+get %r{/things(/(\d+),(\d+)?)?} do
+	content_type "application/json"
+	JSON.pretty_generate :captures=>params[:captures] , :request=>request.inspect
+	# main_erb erb( :list, :locals => { :items=>Things.new.loadSome } )
 end
 
 get "/" do

@@ -52,17 +52,14 @@ end
 times = Timer.new "Program Starts", true
 
 r=Redis.new
-
-r.flushall
 r.select 1
-
+r.flushdb
 system("ruby ./load.rb")
-
 times <<  "Flushed and Loaded"
 
 sha=r['nodes.create']
 puts "'nodes.create': #{sha}"
-n=10000
+n=3000
 
 (1..n).each do |i|
 	r.evalsha sha
@@ -71,6 +68,16 @@ end
 times << "created #{n} nodes"
 
 
+sha=r['things.create'] 
+n.times do | i |
+	begin
+		r.evalsha sha, [], [ "#{rand(n)+1}" ]
+	rescue Exception=>e
+		$stderr.puts e.message
+	end
+end
+
+times << "created #{n} things"
 
 sha=r['arcs.create'] 
 n.times do | i |
@@ -98,10 +105,10 @@ class Most
 	def initialize
 		@mutex = Mutex.new
 		@nodes = []
+		@most=0
 	end
 	def consider node, num
 		@mutex.synchronize {
-			@most = 0
 			num = num.to_i
 			if num>@most
 				@most=num
@@ -152,11 +159,17 @@ end
 m = Most.new
 r.smembers( 'nodes' ).each do |node| 
 	dojoin[false] while threads.count >= maxthreads # need to let some threads die off
+	counter=1
 	threads << Thread.new do
 	begin
 		Thread.current['stderr'] = ""
 		Thread.current['stdout'] = ""
-		rn = Redis.new :host=>"127.0.0.1", :port=>( 6379 + rand(4) )
+		rn = nil
+		until rn
+			rn = Redis.new :host=>"127.0.0.1", :port=>( 6379 + 4 % counter )
+		end
+		rn.select 1
+		counter += 1
 		m.consider node, rn.scard("nodes_#{node}_arcs")
 	rescue Exception=>e
 		Thread.current['stderr'] << e.message

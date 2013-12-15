@@ -5,6 +5,26 @@
 <link rel='stylesheet' href='/main.css' />
 <script type='text/javascript' src="http://code.jquery.com/jquery-2.0.3.min.js" >
 </script>
+<script >
+function moveThing( thing_id, arc_id ){
+	$.ajax( {
+		url: "/arcs/"+arc_id+"/"+"/transfer/"+thing_id,
+		type: 'PUT',
+		success: function(text,text_status,xhr) {
+			location.reload()
+		},
+		error: function( xhr, text_status, error_thrown ){
+			alert( "Ajax Error: \n" + JSON.stringify( { xhr: xhr, textStatus: text_status, errorThrown: error_thrown} ) )
+		},
+		statusCode: {
+			303: function(){
+				alert("303!!!")
+			}
+		}
+
+	})
+}
+</script>
 </head>
 <body>
 <h1><a class=Arcs href='/arcs'>arcs</a> <a href='/'>and</a> <a class='Nodes' href='/nodes'>nodes</a></h1>
