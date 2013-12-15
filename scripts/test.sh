@@ -23,7 +23,7 @@ function test_check {
 	exp=$1
 	ret=$2
 	if [ "$exp" = "$ret" ]; then
-		echo "`color '1;32;99'` ! `color '0;1;32'`Test Pass`color 0`"
+		echo "`color '1;32;99'` ! `color '0;1;32'`Test Pass`color 0`" $ret
 	else
 		echo "`color '1;31;99;5'` ! `color '0;1;41'`Test FAIL `color '5'`!!! `color '0;31'`$ret`color 0` != $exp "
 		exit -1
@@ -108,10 +108,8 @@ success "Create a thing (valid node $n1)"
 t1=`redis-cli -n 1 evalsha $sha 0 $n1`
 echo "t1=$t1"
 nodes=""
-for i in `seq 1 5`; do 
-	nodes="$nodes`redis-cli -n 1 srandmember nodes` "
-done
-success "Create a few things on valid random nodes (valid nodes $nodes )"
+nodes="$nodes`redis-cli -n 1 zrange nodes 0 -1` "
+success "Create a thing on each valid random node ( $nodes )"
 for node  in $nodes; do
 	t2=`redis-cli -n 1 evalsha $sha 0 $node`
 	echo "t2=$t2"
