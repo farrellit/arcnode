@@ -5,20 +5,17 @@
 <h3>
 	<%= item.path_html %>
 </h3>
-<%= Erubis::Eruby.new( File.read( 'views/pathinfo.erb') ).result( :pathable=>item) %>
 <% 
 
 
 unless item.loaded?
 	%><p><em>item is not bound to data </em> ( id: <code><%=id%></code>, item: <code<%= item.inspect %></code> ) </p><%
 else
-	['nodes','arcs'].each do |key|
-		next unless item[key]
+	others = Hash.new
+	item.to_h.each do |key,val|
+		
 		if item[key].kind_of? Pathable %>
 			<h4><%= item[key].path_html %></h4>
-		<% else %>
-			<h4><%= key %></h4>
-		<% end %>
 			<ul>
 			<% item[key].each do |ref,item| %>
 				<li>
@@ -26,11 +23,15 @@ else
 				</li>
 			<% end %>
 		</ul>
-	<% end 
+		<% 
+		else
+			others[key] = val	
+		end
+	end
 	%><h4>Other Parameters</h4>
+
 	<dl>
-	<% item.to_h.each do |key,val|
-		next if ['nodes','arcs'].include? key
+	<% others.each do |key,val|
 		%><dt><%= key %></dt>
 		<dd><%= val.to_s %></dd>
 	<% end %>

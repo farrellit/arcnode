@@ -16,10 +16,10 @@ begin %>
 end
 unless cancel
 %>
-<%= Erubis::Eruby.new( File.read( 'views/pathinfo.erb') ).result( :pathable=>items ) %>
 <p>Showing <kbd><%= items.count %></kbd> members of set <kbd><%= items.set_name %></kbd>.</p>
 <%
+tpl = Erubis::Eruby.new( File.read( 'views/item.erb' ) )
 items.each do |id,item|
-	%><%= Erubis::Eruby.new( File.read( 'views/item.erb') ).result( {:id=> id, :item=>item, :subtitle => nil } ) %>
+	%><%= tpl.result( {:id=> id, :item=>item, :subtitle => nil } ) %>
 <% end %>
 <% end %>

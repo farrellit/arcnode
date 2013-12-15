@@ -16,6 +16,10 @@ div.Node {
 	border-left: dotted 3px #f97;
 	background-color: #fff3ef;
 }
+div.Thing {
+	border-left: dotted 3px #ff7;
+	background-color: #ffffcc;
+}
 
 body  div.Item > h3  {
 	color:white;

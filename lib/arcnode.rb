@@ -2,7 +2,7 @@ require "rubygems"
 require "erubis"
 require "redis"
 require "logger"
-require "colorize"
+require "./lib/expcache/expcache.rb"
 
 $r = Redis.new
 $r.select 1
@@ -107,10 +107,10 @@ end
 
 class Item < Pathable # Node or Arc
 	
-	def initialize id
+	def initialize id = nil
 		@loaded = false
 		@data = [] 
-		load_data id
+		load_data id if id
 	end
 	
 	def load_data id
@@ -175,6 +175,7 @@ class Node < Item
 	def load_data id
 		super
 		param_smembers "arcs", "nodes_#{@id}_arcs", Arcs
+		param_smembers "things", "nodes_#{@id}_things", Things
 	end
 end
 
@@ -188,14 +189,27 @@ class Arc < Item
 		super
 		param_smembers "nodes", "arcs_#{@id}_nodes", Nodes
 	end
+end
+
+class Thing < Item
+	def link_extra
+		nodes = ""
+		@data['nodes'].each{ |id,node| nodes << " <a href='#{node.link_url}'>#{id}</a> " }
+		"Habitating Node: #{nodes}"
+	end
+	def load_data id
+		super
+		param_smembers "nodes", "things_#{@id}_nodes", Nodes 
+	end
 
 
 end
 
-
 class ItemSet  < Pathable  #Nodes or Arcs
-	
+	attr_reader :type
 	attr_accessor :set_name, :subtitle
+	
+public
 	def initialize type
 		@type = type
 		@set = [ ]
@@ -203,6 +217,22 @@ class ItemSet  < Pathable  #Nodes or Arcs
 		@subtitle = self.class.name
 	end
 	
+
+	def newobj id
+		@@cache ||= {}
+		@@cache[@set_name] ||= ExpCache.new :default_timeout=>10.0
+		obj = @@cache[@set_name].get id
+		unless obj
+			#$log.info "#{self.class.name}: #{id} being retrieved and cached"
+			obj = @type.new id
+			@@cache[@set_name].add id, obj
+		else
+			#$log.info "#{self.class.name}: #{id} found in cache"
+		end
+		#obj.load_data id
+		obj
+	end
+
 	def url_component
 		return @type.setName()
 	end
@@ -210,7 +240,7 @@ class ItemSet  < Pathable  #Nodes or Arcs
 	def to_h 
 		h = {}
 		@set.each do |id|
-			h[id] = @type.new( id) 
+			h[id] = newobj( id )
 		end
 	end
 
@@ -220,10 +250,15 @@ class ItemSet  < Pathable  #Nodes or Arcs
 		end
 	end
 		
-
-	def each 
+	def each_id
 		@set.each do |id|
-			yield id, @type.new( id )
+			yield id
+		end
+	end
+
+	def each
+		@set.each do |id|
+			yield id, newobj(id)
 		end
 	end
 	
@@ -253,6 +288,12 @@ end
 class Nodes < ItemSet
 	def initialize 
 		super Node
+	end
+end
+
+class Things < ItemSet
+	def initialize
+		super Thing
 	end
 end
 

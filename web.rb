@@ -1,7 +1,6 @@
 #!/usr/bin/ruby
 #
 require 'sinatra'
-require './lib/expcache/expcache.rb'
 require './lib/arcnode.rb' 
 
 helpers do
@@ -81,6 +80,16 @@ get "/nodes/:id/arcs" do
 	end
 end
 
+get "/nodes/:id/things" do
+	n = Node.new(params[:id])
+	if n.loaded?
+		main_erb list_erb( js ? n['things'].to_h : n['things'] )
+	else
+		status 404
+		main_erb( item_erb( js ? n.to_h : n ) )
+	end
+end
+
 get "/arcs/:id/nodes" do
 	n = Arc.new(params[:id])
 	if n.loaded?
@@ -105,6 +114,23 @@ end
 
 get "/arcs" do
 	main_erb erb( :list, :locals => { :items=>Arcs.new.loadAll } )
+end
+
+get "/things/:id/nodes" do
+	n = Thing.new(params[:id])
+	if n.loaded?
+		main_erb list_erb( js ? n['nodes'].to_h : n['nodes'] )
+	else
+		status 404
+		main_erb( item_erb( js ? n.to_h : n ) )
+	end
+end
+get "/things/:id" do
+	main_erb item_erb(params[:id], Thing)
+end
+
+get "/things" do
+	main_erb erb( :list, :locals => { :items=>Things.new.loadAll } )
 end
 
 get "/" do

@@ -62,7 +62,7 @@ times <<  "Flushed and Loaded"
 
 sha=r['nodes.create']
 puts "'nodes.create': #{sha}"
-n=10240
+n=10000
 
 (1..n).each do |i|
 	r.evalsha sha

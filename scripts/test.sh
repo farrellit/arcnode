@@ -1,4 +1,5 @@
 
+
 function color {
 	echo -ne "\033[$1m$2"
 }
@@ -29,9 +30,11 @@ function test_check {
 	fi
 }
 
+
 color '00;44;97' "### nodes.create `color 0`\n"
 
 sha=`redis-cli -n 1 get nodes.create`
+nodes_create=$sha
 echo -e "`color "103;1"`nodes.create`color "0;"` $sha"
 
 success "Create Node"
@@ -50,6 +53,7 @@ test_check 0 $?
 color '00;44;97' "### arcs.create `color 0`\n"
 
 sha=`redis-cli -n 1 get arcs.create`
+arcs_create=`redis-cli -n 1 get arcs.create`
 echo -e "`color "103;1"`arcs.create`color "0;"` $sha"
 failure both nodes must exist, 
 redis-cli -n 1 evalsha $sha 0 0 0 
@@ -63,12 +67,14 @@ redis-cli -n 1 evalsha $sha 0 $n1 $n2
 failure nodes already linked
 redis-cli -n 1 evalsha $sha 0 $n1 $n2
 success create arc
-redis-cli -n 1 evalsha $sha 0 $n2 $n3
+a2=`redis-cli -n 1 evalsha $sha 0 $n2 $n3`
+echo $a2
 success create arc
 a3=`redis-cli -n 1 evalsha $sha 0 $n3 $n1`
+echo $a3
 success create arc
 a4=`redis-cli -n 1 evalsha $sha 0 $n4 $n1`
-
+echo $a4
 
 color '00;44;97' "### arcs.delete `color 0`\n" 
 
@@ -82,13 +88,65 @@ redis-cli -n 1 evalsha $sha 0 $a4
 color '00;44;97' "### nodes.delete`color 0`\n" 
 
 sha=`redis-cli -n 1 get nodes.delete`
+nodes_delete=$sha
 echo -e "`color "103;1"`nodes.delete`color "0;"` $sha"
 success delete node $n4 "( now unlinked )"
 redis-cli -n 1 evalsha $sha 0 $n4
 failure delete node $n4 "(does not exist)"
 redis-cli -n 1 evalsha $sha 0 $n4
-
 failure delete node $n1 "(arcs link)"
 redis-cli -n 1 evalsha $sha 0 $n1
+
+color '00;44;97' "### things.create `color 0`\n" 
+
+sha=`redis-cli -n 1 get things.create`
+things_create=$sha
+echo -e "`color "103;1"`things.create `color "0;"` $sha"
+failure "Create a thing ( bad node 0 )"
+redis-cli -n 1 evalsha $sha 0 0
+success "Create a thing (valid node $n1)"
+t1=`redis-cli -n 1 evalsha $sha 0 $n1`
+echo "t1=$t1"
+nodes=""
+for i in `seq 1 5`; do 
+	nodes="$nodes`redis-cli -n 1 srandmember nodes` "
+done
+success "Create a few things on valid random nodes (valid nodes $nodes )"
+for node  in $nodes; do
+	t2=`redis-cli -n 1 evalsha $sha 0 $node`
+	echo "t2=$t2"
+done
+
+color '00;44;97' "### things.delete `color 0`\n" 
+sha=`redis-cli -n 1 get things.delete`
+echo -e "`color "0;103;"`things.delete `color "0;"` $sha"
+
+failure delete thing 0 "(does not exist)"
+redis-cli -n 1 evalsha $sha 0 0
+
+success delete thing $t2 
+redis-cli -n 1 evalsha $sha 0 $t2
+
+color '00;44;97' "### nodes.delete + thing `color 0`\n" 
+n=`redis-cli -n 1 evalsha $nodes_create 0` 
+t=`redis-cli -n 1 evalsha $things_create 0 $n`
+failure delete node $n "(inhabitant)"
+redis-cli -n 1 evalsha $nodes_delete 0 $n
+success delete thing $t 
+redis-cli -n 1 evalsha $sha 0 $t
+success delete now uninhabitaed node $n
+redis-cli -n 1 evalsha $nodes_delete 0 $n
+
+exit
+
+color '00;44;97' "### things.move `color 0`\n" 
+sha=`redis-cli -n 1 get things.move`
+things_move=$sha
+echo -e "`color '0;103'`things.move `color 0` $sha"
+failure $t1 cannot reach arc $a2
+redis-cli -n 1 evalsha $things_move 0 $t1 $a2
+success move $t1 through $a3
+redis-cli -n 1 evalsha $things_move 0 $t1 $a3
+
 
 fi

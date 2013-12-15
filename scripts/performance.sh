@@ -1,5 +1,5 @@
 #!/bin/bash
-num=1024
+num=10240
 redis-cli -n 1 flushall
 ruby ./load.rb
 sha=`redis-cli -n 1 get nodes.create`

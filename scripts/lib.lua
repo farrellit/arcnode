@@ -44,6 +44,13 @@ end
 
 local tools={}
 
+--[[
+tools.logdel =function( key ) 
+	log( "delete " .. key )
+	redis.call( "DEL",  key )
+end
+--]]
+
 tools.index = {}
 
 tools.index.next_id = function ( opts )
@@ -145,30 +152,6 @@ tools.arcnode = {}
 
 tools.arcs = {}
 
-tools.arcs.config = { 
-	name="arcs",
-	index="arcs",
-	each_indices = { 
-		nodes=function (id) return "arcs_"..id.."_nodes" end
-	},
-	each_templates= {
-		id={ 
-			genname=function (id) return "arcs_"..id end,
-			attributes={
-				factor_atrophy=1.0,
-				factor_wear=1.0,
-				count_traversals=0
-			}
-		}
-	}
-}
-
-tools.arcs.exists = function ( opts )
-	assert( type(opts) == 'table', "tools.arcs.exists: opts must be table" )
-	assert( not(type(opts['id']) == 'nil'), "tools.arcs.exists: opts['id'] must be set" )
-	return tools.index.exists( { index=tools.arcs.config.index , value=opts['id'] } )
-end
-
 tools.arcnode.create = function ( opts )
 	assert( type(opts) == 'table', 
 		"tools.arcnode.create: opts must be table" )
@@ -186,24 +169,20 @@ tools.arcnode.create = function ( opts )
 		end
 	end
 	for rel,ifunc in pairs( config.each_indices ) do
-		assert( type(opts[rel] ) == 'table', "config.each_indexes entry '"..rel.."' missing from opts" )
-		for i,other in pairs( opts[rel] ) do 
-			tools.index.cross( { 
-				{ index=ifunc(id), value=id },
-				{ index=tools[rel].config.each_indices[config.name](other), value=other }
-			} )
+		if( type( opts[rel] ) == 'table' ) then 
+			for i,other in pairs( opts[rel] ) do 
+				tools.index.cross( { 
+					{ index=ifunc(id), value=id },
+					{ index=tools[rel].config.each_indices[config.name](other), value=other }
+				} )
+			end
 		end
 	end
 	tools.index.add( { index=config.index, value=id } )
 	redis.call( 'HSET', config.each_templates.id.genname( id ), 'id', id)
 	return id
 end
---[[
-tools.logdel =function( key ) 
-	log( "delete " .. key )
-	redis.call( "DEL",  key )
-end
---]]
+
 tools.arcnode.std_assert = function( opts )
 	type_assert( opts, 'table')
 	type_assert( opts.id, 'nil', nil, true )
@@ -233,7 +212,32 @@ tools.arcnode.delete = function( opts )
 	end
 	return opts.id
 end
-	
+
+-- ARCS
+
+tools.arcs.config = { 
+	name="arcs",
+	index="arcs",
+	each_indices = { 
+		nodes=function (id) return "arcs_"..id.."_nodes" end
+	},
+	each_templates= {
+		id={ 
+			genname=function (id) return "arcs_"..id end,
+			attributes={
+				factor_atrophy=1.0,
+				factor_wear=1.0,
+				count_transfers=0
+			}
+		}
+	}
+}
+
+tools.arcs.exists = function ( opts )
+	assert( type(opts) == 'table', "tools.arcs.exists: opts must be table" )
+	assert( not(type(opts['id']) == 'nil'), "tools.arcs.exists: opts['id'] must be set" )
+	return tools.index.exists( { index=tools.arcs.config.index , value=opts['id'] } )
+end
 
 tools.arcs.create = function ( opts )
 	assert( type(opts) == 'table', 
@@ -270,13 +274,69 @@ tools.arcs.delete = function ( opts )
 	return tools.arcnode.delete( { id=opts.id, config=tools.arcs.config } )
 end
 
+tools.arcs.transfer = function( opts )
+	tools.arcnode.std_assert(opts)
+	-- thing exists
+	type_assert( opts.thing , 'nil', nil, true )
+	assert( tools.things.exists( {id=opts.thing}), "Thing does not exist:" .. opts.thing)
+	-- ensure the arc is accessible from the node
+	local current_node = tools.things.node( {id=opts.thing} )
+	local ismember=redis.call( 
+			"SISMEMBER", 
+			tools.nodes.config.each_indices.arcs( current_node ),
+			opts.id -- this arc
+		)
+	redis.log(redis.LOG_NOTICE, "thing " .. opts.thing .." reach arc " .. opts.id .. " from " .. current_node .. "? Answer: " .. ismember )
+	assert( tonumber(ismember) > 0 ,
+		"thing " .. opts.thing .." cannot reach arc " .. opts.id
+	)
+	-- find target node 
+	local target_node = nil
+	for i,v in pairs( redis.call(
+		'SMEMBERS', 
+		tools.arcs.config.each_indices.nodes( opts.id )
+	) ) do
+		if not( v == current_node ) then
+			target_node = v
+			redis.log( redis.LOG_NOTICE, "found target node " .. i .. " => " .. v  )
+		end
+	end
+	redis.log(redis.LOG_NOTICE, "target node: " .. target_node ) 
+	assert(tools.nodes.exists( { id=current_node } ),
+		 "No valid target node for thing "..opts.thing 
+		.." from node " .. current_node .. " through arc " .. opts.id 
+	)
+	-- remove from node
+	tools.index.uncross(  
+		{ 
+			{index=tools.things.config.each_indices.nodes(opts.thing),  value = opts.thing},
+			{index=tools.nodes.config.each_indices.things( current_node ), value = current_node}
+		} 
+	)
+	-- add to new node
+	tools.index.cross(  
+		{ 
+			{index=tools.things.config.each_indices.nodes(opts.thing),  value = opts.thing},
+			{index=tools.nodes.config.each_indices.things( target_node ), value = target_node}
+		} 
+	)
+	-- count trancersals
+	local counter = tools.arcs.config.each_templates.id.genname( opts.id )
+	redis.call( "HSETNX", counter , 'count_transfers', 0 )
+	redis.call( "HINCRBY", counter , 'count_transfers', 1 )
+	return target_node
+end
+	
+-- NODES
+
 tools.nodes = {}
 
 tools.nodes.config = { 
 	name="nodes",
 	index="nodes",
 	each_indices = { 
-		arcs=function (id) assert( not ( id == nil ), "id Cannot be NIL".. debug.traceback()  ); return "nodes_"..id.."_arcs" end
+		arcs=function (id) assert( not ( id == nil ), "id Cannot be NIL".. debug.traceback()  ); return "nodes_"..id.."_arcs" end,
+		things=function (id) assert( not ( id == nil ), "id Cannot be NIL".. debug.traceback()  ); return "nodes_"..id.."_things" end
 	},
 	each_templates= {
 		id={ 
@@ -287,7 +347,7 @@ tools.nodes.config = {
 }
 
 tools.nodes.exists = function ( opts )
-	assert( type(opts) == 'table', "tools.nodes.exists: opts must be table" )
+	assert( type(opts) == 'table', "tools.nodes.exists: opts must be table" .. debug.traceback() )
 	type_assert( opts['id'], 'nil', nil, true )
 	return tools.index.exists( { index=tools.nodes.config.index , value=opts['id'] } )
 end
@@ -302,9 +362,78 @@ end
 tools.nodes.delete = function ( opts )
 	type_assert( opts, "table")
 	type_assert( opts.id, "nil", nil, true)
+	for i,v in pairs( redis.call( "SMEMBERS", tools.nodes.config.each_indices.things(opts.id)  ) ) do
+		assert( not( tools.things.exists( {id=v}) ), 
+			"Cannot delete node " .. opts.id .. " : inhabited by thing " .. v )
+	end
 	for i,v in pairs( redis.call( "SMEMBERS", tools.nodes.config.each_indices.arcs(opts.id)  ) ) do
 		assert( not( tools.arcs.exists( {id=v}) ), 
 			"Cannot delete node " .. opts.id .. " : connected by arc " .. v )
 	end
 	return tools.arcnode.delete( { id=opts.id, config=tools.nodes.config } )
 end
+
+-- THINGS
+
+tools.things = {}
+tools.things.config = {
+	name="things",
+	index="things",
+	each_indices = {
+		nodes = function( id ) return "things_"..id.."_nodes" end
+	},
+	each_templates= {
+		id={ 
+			genname=function (id) return "things_"..id end,
+			attributes={ }
+		}
+	}
+}
+
+tools.things.node =function(opts)
+	tools.arcnode.std_assert(opts)
+	local nodes =redis.call( 
+		"SMEMBERS",
+		tools.things.config.each_indices.nodes( opts.id ) -- node of this thing
+	)
+	local node 
+	for i,v in pairs(nodes) do
+		node = v
+	end
+	return node
+end
+
+tools.things.exists = function ( opts )
+	assert( type(opts) == 'table', "tools.things.exists: opts must be table" )
+	assert( not(type(opts['id']) == 'nil'), "tools.things.exists: opts['id'] must be set" )
+	return tools.index.exists( { index=tools.things.config.index , value=opts['id'] } )
+end
+
+tools.things.create = function ( opts )
+	assert( type(opts) == 'table', 
+		"tools.things.create: opts must be table" )
+	type_assert( opts.nodes, 'table')
+	local c = 0
+	for i in pairs(opts.nodes) do c = c + 1 end
+	assert( c == 1, "Only one node is allowed per thing when creating nodes; I got " .. c )
+	assert(tools.nodes.exists( { id=opts.nodes[0] } ), "node does not exist: " .. opts.nodes[0] )
+	opts.config = tools.things.config
+	return tools.arcnode.create( opts )
+end
+
+tools.things.delete = function ( opts )
+	type_assert( opts, "table")
+	type_assert( opts.id, "nil", nil, true)
+	return tools.arcnode.delete( { id=opts.id, config=tools.things.config } )
+end
+
+tools.things.move = function ( opts )
+	type_assert( opts, "table")
+	type_assert( opts.id, "nil", nil, true)
+	type_assert( opts.arc, "nil", nil, true)
+	-- arcs must have a chance to process this transaction!
+	return tools.arcs.transfer( { id=opts.arc, thing=opts.id} )
+end
+
+
+

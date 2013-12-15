@@ -26,7 +26,7 @@ lib= File.read 'lib.lua'
 			f.close_write
 			puts f.read.red
 		}
-		puts "#{e.class.name}: #{e.message} \n#{e.backtrace.join "\n\t"}"
+		puts "Error in #{file.bold}: #{e.class.name}: #{e.message} \n#{e.backtrace.join "\n\t"}"
 		exit(-1)
 	end	
 end
