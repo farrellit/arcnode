@@ -13,16 +13,17 @@ helpers do
 		return request.accept? "application/json"
 	end
 
-	def exception_json e, msg = ""
-		status 500
-		JSON.pretty_generate	 Hash.new( 
-			"exception" => {
+	def exception_json e, msg = "", s=500
+		status s
+		content_type "application/json"
+		j=JSON.pretty_generate "exception" => {
 				"type" => e.class.name,
 				"message" => e.message.to_s,
 				"backtrace" => e.backtrace.to_a,
 			},
 			"message" => msg.to_s
-		)
+		$stderr.puts j
+		return j
 	end
 	def main_erb body 
 		if js 
@@ -70,7 +71,7 @@ helpers do
 	end
 end
 
-
+=begin
 
 get "/nodes/:id/arcs" do
 	n = Node.new(params[:id])
@@ -92,6 +93,8 @@ get "/nodes/:id/things" do
 	end
 end
 
+=end
+
 put "/arcs/:id/transfer/:thing" do
 	r = Redis.new
 	r.select 1
@@ -106,6 +109,8 @@ put "/arcs/:id/transfer/:thing" do
 	end
 end
 
+=begin 
+
 get "/arcs/:id/nodes" do
 	n = Arc.new(params[:id])
 	if n.loaded?
@@ -114,22 +119,6 @@ get "/arcs/:id/nodes" do
 		status 404
 		main_erb( item_erb( js ? n.to_h : n ) )
 	end
-end
-
-get "/nodes/:id" do
-	main_erb item_erb(params[:id], Node)
-end
-
-get "/nodes" do
-	main_erb list_erb(Nodes.new.loadAll)
-end
-
-get "/arcs/:id" do
-	main_erb item_erb(params[:id], Arc)
-end
-
-get "/arcs" do
-	main_erb erb( :list, :locals => { :items=>Arcs.new.loadAll } )
 end
 
 get "/things/:id/nodes" do
@@ -141,15 +130,114 @@ get "/things/:id/nodes" do
 		main_erb( item_erb( js ? n.to_h : n ) )
 	end
 end
-get %r{/things/(\d+)$} do
-	id = params[:captures][0]
-	main_erb item_erb(id, Thing)
+
+=end
+
+def class_by_param param, type = ItemSet
+	c = Object.const_get( cname = param.capitalize )
+	raise TypeError.new( "Invalid set #{param} (converted to #{cname})"
+			) unless c.kind_of? Class and c < type
+	c
 end
 
-get %r{/things(/(\d+),(\d+)?)?} do
-	content_type "application/json"
-	JSON.pretty_generate :captures=>params[:captures] , :request=>request.inspect
-	# main_erb erb( :list, :locals => { :items=>Things.new.loadSome } )
+def obj_by_param param, type = Item
+	c = Object.const_get( cname = param.gsub(/s$/, '' ).capitalize )
+	raise TypeError.new( "Invalid object #{param} (converted to #{cname})"
+			) unless c.kind_of? Class and c < type
+	c
+end
+
+def start_and_finish cstart, cfinish
+	start = 0
+	span=10
+	finish = start + span
+	if cstart and cstart.to_i 
+		start = cstart.to_i
+		finish = start + span
+		s=true
+	end
+	if cfinish and cfinish.to_i and cfinish.to_i <= finish
+		finish = cfinish
+		f=true
+	end
+	unless s and f # unless used captured (param) start and finish
+		return :status=>303, :suburl=>"#{start},#{finish}"
+	end
+	return { :status=>200, :start=>start,:finish=>finish}
+end
+
+# view any viewable or subset
+get %r:^/([a-z]+)/(\d+)(/([a-z]+)(/(\d+),(\d+)/?)?)?$: do
+	ctype = 0
+	cid   = 1
+	csub = 3 
+	cstart=5
+	cfinish=6
+	begin 
+		c = obj_by_param params[:captures][ctype]
+		id = params[:captures][cid].to_i
+		n = c.new id
+		if params[:captures][csub]
+			sub = params[:captures][csub]
+			raise Exception.new "No such parameter: sub" unless n[sub]
+			raise TypeError.new( "parameter #{sub} is not listable ( unimplemented" 
+				) unless n[sub].kind_of? ItemSet
+			sf = start_and_finish params[:captures][cstart], params[:captures][cfinish]
+			if sf[:status] == 303
+				redirect "/#{params[:captures][ctype]}/#{id}/"+
+					"#{params[:captures][csub]}/#{sf[:suburl]}", 303
+			else
+				erb = main_erb erb(:list, :locals=>{ 
+						:items=>n[sub].loadSome(sf[:start], sf[:finish])
+				})
+			end
+		else
+			#js ? n.to_h : item_erb(n)
+			erb = item_erb(n)
+		end
+		main_erb erb 
+	rescue Exception=>e
+		status 404
+		exception_json( e, "Could not create class and view id #{id} of #{c.inspect}", 404 )
+	end
+end
+
+# view any viewable set
+get %r{^/([a-z]+)(/((\d+),(\d+)?/?)?)?$} do
+	ctype = 0
+	cstart = 3
+	cfinish = 4
+	begin 
+		captures = params[:captures]
+		puts captures.to_json
+		c = class_by_param params[:captures][ctype]
+		if captures[cstart]  and captures[cstart].to_i
+			puts "Valid start #{captures[cstart]}"
+			start = captures[cstart].to_i
+		else
+			start = 0
+		end
+		finish = start + 100 # upper limit of range is set here ...
+		if captures[cfinish] and captures[cfinish].to_i  and captures[cfinish].to_i <= finish # and enforced here ...
+			finish= captures[cfinish].to_i 
+			puts "Valid finish passed #{captures[cfinish]}"
+		end
+		unless (
+			( captures[cfinish] and captures[cfinish].to_i and captures[cfinish].to_i == finish  ) and
+			( captures[cstart]  and captures[cstart].to_i and captures[cstart].to_i == start )
+		)
+			url="/#{captures[ctype]}/#{start},#{finish}"
+			puts "Redirecting to ranged url: #{url}\n" + 
+				"Type: #{captures[ctype]}: showing #{captures[ctype]} #{start} to #{finish}"
+			redirect url, 303
+		else	
+			puts "Type: #{captures[ctype]}: showing #{captures[ctype]} #{start} to #{finish}"
+			main_erb erb( :list, :locals => { :items=>c.new.loadSome( start,finish )} )
+		end
+	rescue Exception=>e
+		status 404
+		exception_json( e, "Could not create class and view #{start}-#{finish} of #{c.inspect}", 404 )
+	end
 end
 
 get "/" do
