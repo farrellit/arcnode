@@ -71,30 +71,6 @@ helpers do
 	end
 end
 
-=begin
-
-get "/nodes/:id/arcs" do
-	n = Node.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['arcs'].to_h : n['arcs'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
-get "/nodes/:id/things" do
-	n = Node.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['things'].to_h : n['things'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
-=end
-
 put "/arcs/:id/transfer/:thing" do
 	r = Redis.new
 	r.select 1
@@ -108,30 +84,6 @@ put "/arcs/:id/transfer/:thing" do
 		"#{e.class.name}: #{e.message}.  #{e.backtrace.join ", " } "
 	end
 end
-
-=begin 
-
-get "/arcs/:id/nodes" do
-	n = Arc.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['nodes'].to_h : n['nodes'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
-get "/things/:id/nodes" do
-	n = Thing.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['nodes'].to_h : n['nodes'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
-=end
 
 def class_by_param param, type = ItemSet
 	c = Object.const_get( cname = param.capitalize )
@@ -147,9 +99,9 @@ def obj_by_param param, type = Item
 	c
 end
 
-def start_and_finish cstart, cfinish
+def start_and_finish cstart, cfinish, preurl
 	start = 0
-	span=10
+	span=9
 	finish = start + span
 	if cstart and cstart.to_i 
 		start = cstart.to_i
@@ -157,43 +109,48 @@ def start_and_finish cstart, cfinish
 		s=true
 	end
 	if cfinish and cfinish.to_i and cfinish.to_i <= finish
-		finish = cfinish
+		finish = cfinish.to_i
 		f=true
 	end
+	preurl = "#{preurl}/" unless %r:/$: =~ preurl
+	suburl="#{start},#{finish}"
 	unless s and f # unless used captured (param) start and finish
-		return :status=>303, :suburl=>"#{start},#{finish}"
+		return :status=>303, :url=>"#{preurl}/#{suburl}", :suburl=>suburl, :preurl=>preurl
 	end
-	return { :status=>200, :start=>start,:finish=>finish}
+	return :status=>200, :start=>start,:finish=>finish, :preurl=>preurl, :suburl=>suburl
 end
 
 # view any viewable or subset
-get %r:^/([a-z]+)/(\d+)(/([a-z]+)(/(\d+),(\d+)/?)?)?$: do
+get %r:^/([a-z]+)/(\d+)(/([a-z]+)(/(\d+),((\d+)/?)?)?)?$: do
 	ctype = 0
 	cid   = 1
 	csub = 3 
 	cstart=5
-	cfinish=6
+	cfinish=7
 	begin 
 		c = obj_by_param params[:captures][ctype]
 		id = params[:captures][cid].to_i
 		n = c.new id
+		# if a subgroup, we need to handle paging there
 		if params[:captures][csub]
 			sub = params[:captures][csub]
+			preurl="/#{params[:captures][ctype]}/#{id}/#{sub}"
 			raise Exception.new "No such parameter: sub" unless n[sub]
 			raise TypeError.new( "parameter #{sub} is not listable ( unimplemented" 
 				) unless n[sub].kind_of? ItemSet
-			sf = start_and_finish params[:captures][cstart], params[:captures][cfinish]
+			sf = start_and_finish params[:captures][cstart], params[:captures][cfinish], preurl
 			if sf[:status] == 303
 				redirect "/#{params[:captures][ctype]}/#{id}/"+
 					"#{params[:captures][csub]}/#{sf[:suburl]}", 303
 			else
-				erb = main_erb erb(:list, :locals=>{ 
-						:items=>n[sub].loadSome(sf[:start], sf[:finish])
+				erb = erb(:list, :locals=>{ 
+						:items=>n[sub].loadSome(sf[:start], sf[:finish]),
+						:sf=>sf
 				})
 			end
+		# no subgroup; we just apply 
 		else
-			#js ? n.to_h : item_erb(n)
-			erb = item_erb(n)
+			erb = (js ? n.to_h : item_erb(n) )
 		end
 		main_erb erb 
 	rescue Exception=>e
@@ -209,34 +166,17 @@ get %r{^/([a-z]+)(/((\d+),(\d+)?/?)?)?$} do
 	cfinish = 4
 	begin 
 		captures = params[:captures]
-		puts captures.to_json
 		c = class_by_param params[:captures][ctype]
-		if captures[cstart]  and captures[cstart].to_i
-			puts "Valid start #{captures[cstart]}"
-			start = captures[cstart].to_i
-		else
-			start = 0
-		end
-		finish = start + 100 # upper limit of range is set here ...
-		if captures[cfinish] and captures[cfinish].to_i  and captures[cfinish].to_i <= finish # and enforced here ...
-			finish= captures[cfinish].to_i 
-			puts "Valid finish passed #{captures[cfinish]}"
-		end
-		unless (
-			( captures[cfinish] and captures[cfinish].to_i and captures[cfinish].to_i == finish  ) and
-			( captures[cstart]  and captures[cstart].to_i and captures[cstart].to_i == start )
-		)
-			url="/#{captures[ctype]}/#{start},#{finish}"
-			puts "Redirecting to ranged url: #{url}\n" + 
-				"Type: #{captures[ctype]}: showing #{captures[ctype]} #{start} to #{finish}"
+		sf = start_and_finish captures[cstart], captures[cfinish], "/#{captures[ctype]}"
+		if sf[:status] == 303
+			url="/#{captures[ctype]}/#{sf[:suburl]}"
 			redirect url, 303
 		else	
-			puts "Type: #{captures[ctype]}: showing #{captures[ctype]} #{start} to #{finish}"
-			main_erb erb( :list, :locals => { :items=>c.new.loadSome( start,finish )} )
+			main_erb erb( :list, :locals => { :items=>c.new.loadSome( sf[:start],sf[:finish] ), :sf=>sf} )
 		end
 	rescue Exception=>e
 		status 404
-		exception_json( e, "Could not create class and view #{start}-#{finish} of #{c.inspect}", 404 )
+		exception_json( e, "Could not create class and view of #{c.inspect}", 404 )
 	end
 end
 

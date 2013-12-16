@@ -292,6 +292,10 @@ public
 		return loadSome 0, -1
 	end
 
+	def full_count 
+		return $r.zcard @set_name
+	end
+
 	def count
 		return @set.count
 	end

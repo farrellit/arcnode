@@ -16,8 +16,32 @@ begin %>
 end
 unless cancel
 %>
-<p>Showing <kbd><%= items.count %></kbd> members of set <kbd><%= items.set_name %></kbd>.</p>
-<%
+<p>
+<kbd>Set <%= items.set_name %></kbd> has <kbd><%= items.full_count %></kbd> members.
+</p>
+<!-- next and previous links -->
+<% if sf and items.full_count > 0
+	%><p><%
+range=sf[:finish] - sf[:start] # could show previous
+	if sf[:start] > 0
+		prevstart = sf[:start]-range
+		prevstart=0 if prevstart<0
+		prevfinish = prevstart + range
+		%><a href="<%= "#{sf[:preurl]}#{prevstart},#{prevfinish}"%>">&larr;Members <%=prevstart%>&ndash;<%=prevfinish%></a> | <% 
+	end
+	if sf[:start] == 0 and sf[:finish] >= items.full_count - 1
+	%>Showing all <%= items.full_count  %> members.<%:w
+	else
+	%> Showing members <kbd><%= sf[:start].to_i + 1 %></kbd> to <kbd><%= sf[:finish] + 1 %></kbd>. <%
+	end
+	if sf[:finish] < items.full_count-1 # could show more / next
+		nextstart = sf[:finish] + 1
+		nextfinish = nextstart + range
+		%> | <a href="<%= "#{sf[:preurl]}#{nextstart},#{nextfinish}"%>">Members <%=nextstart%>&ndash;<%=nextfinish%>&rarr;</a> <% 
+	end 
+	%></p>
+<% 
+end
 tpl = Erubis::Eruby.new( File.read( 'views/item.erb' ) )
 items.each do |id,item|
 	%><%= tpl.result( {:id=> id, :item=>item, :subtitle => nil } ) %>
