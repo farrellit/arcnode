@@ -114,7 +114,7 @@ class Item < Pathable # Node or Arc
 	end
 	
 	def load_data id
-		if $r.sismember self.class.setName, id
+		if $r.zrank self.class.setName, id 
 			@id = id
 			@data = $r.hgetall get_data_key
 		else
@@ -135,7 +135,7 @@ class Item < Pathable # Node or Arc
 		return @data
 	end
 
-	def param_smembers key, redis_key, type
+	def param_members key, redis_key, type
 		itemset = type.new
 		itemset.set_name = redis_key
 		itemset.path = self.path 
@@ -174,8 +174,8 @@ class Node < Item
 	end
 	def load_data id
 		super
-		param_smembers "arcs", "nodes_#{@id}_arcs", Arcs
-		param_smembers "things", "nodes_#{@id}_things", Things
+		param_members "arcs", "nodes_#{@id}_arcs", Arcs
+		param_members "things", "nodes_#{@id}_things", Things
 	end
 end
 
@@ -187,7 +187,7 @@ class Arc < Item
 	end
 	def load_data id
 		super
-		param_smembers "nodes", "arcs_#{@id}_nodes", Nodes
+		param_members "nodes", "arcs_#{@id}_nodes", Nodes
 	end
 end
 
@@ -206,7 +206,7 @@ class Thing < Item
 	end
 	def load_data id
 		super
-		param_smembers "nodes", "things_#{@id}_nodes", Nodes 
+		param_members "nodes", "things_#{@id}_nodes", Nodes 
 	end
 
 
@@ -278,12 +278,22 @@ public
 		@set.push obj unless @set.include? obj
 	end
 	
-	def loadAll
+	def loadSome start, finish
+		start = start.to_i
+		finish = finish.to_i
 		@set.clear
-		$r.smembers( @set_name ).each do |item_id|
+		$r.zrange( @set_name, start, finish ).each do |item_id|
 			add item_id
 		end
 		return self
+	end
+
+	def loadAll
+		return loadSome 0, -1
+	end
+
+	def full_count 
+		return $r.zcard @set_name
 	end
 
 	def count

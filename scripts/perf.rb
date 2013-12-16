@@ -123,15 +123,15 @@ end
 
 
 m = Most.new
-r.smembers( 'nodes' ).each do |node| 
-	m.consider node, r.scard("nodes_#{node}_arcs")
+r.zrange( 'nodes',0,-1 ).each do |node| 
+	m.consider node, r.zcard("nodes_#{node}_arcs")
 end
 
 
 
 times << "Found node(s) with the most arcs - nodes #{ m.nodes.map{|n| "http://localhost:4567/nodes/#{n}" }.join ","} have #{m.most}"
 nodes_delete =r['nodes.delete']
-all = r.scard 'nodes'
+all = r.zcard 'nodes'
 removed=0
 threads = []
 maxthreads=100
@@ -157,7 +157,7 @@ joinall=Proc.new do
 end
 
 m = Most.new
-r.smembers( 'nodes' ).each do |node| 
+r.zrange( 'nodes',0,-1 ).each do |node| 
 	dojoin[false] while threads.count >= maxthreads # need to let some threads die off
 	counter=1
 	threads << Thread.new do
@@ -170,7 +170,7 @@ r.smembers( 'nodes' ).each do |node|
 		end
 		rn.select 1
 		counter += 1
-		m.consider node, rn.scard("nodes_#{node}_arcs")
+		m.consider node, rn.zcard("nodes_#{node}_arcs")
 	rescue Exception=>e
 		Thread.current['stderr'] << e.message
 	end
@@ -181,7 +181,7 @@ joinall[]
 
 times << "Found node(s) with the most arcs - nodes #{ m.nodes.map{|n| "http://localhost:4567/nodes/#{n}" }.join ","} have #{m.most}\nthis time, threaded."
 
-r.smembers( 'nodes' ).each do |node|
+r.zrange( 'nodes',0,-1 ).each do |node|
 	dojoin[false] while threads.count >= maxthreads # need to let some threads die off
 	threads << Thread.new do 
 	begin

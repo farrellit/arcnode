@@ -1,11 +1,10 @@
---[[
 local function log (msg) 
 	redis.log( redis.LOG_NOTICE, msg )
 end
 local function notice (msg) 
 	redis.log( redis.LOG_NOTICE, debug.traceback() .. "\n" .. msg )
 end
---]]
+
 local function type_assert ( var, target_type, msg, neg )
 	if not msg then
 		local type_message
@@ -44,12 +43,10 @@ end
 
 local tools={}
 
---[[
 tools.logdel =function( key ) 
 	log( "delete " .. key )
 	redis.call( "DEL",  key )
 end
---]]
 
 tools.index = {}
 
@@ -63,20 +60,20 @@ tools.index.next_id = function ( opts )
 	while i == 0  do
 		i = tonumber( redis.call( "INCR", opts['counter'] ) )
 		if tools.index.exists( { index=opts['index'], value=i} ) then
-			--[[notice( "\"Unused\" ID ".. i  .. " from " .. opts['counter'] 
+			notice( "\"Unused\" ID ".. i  .. " from " .. opts['counter'] 
 				.. " already existed in " .. opts['index'] 
 				.. " : choosing another " )
-			--]]
 			i = 0
 		end
 	end
 	return i
 end
 
+-- should be used with caution on large indexes.
 tools.index.all = function( opts )
 	type_assert( opts, 'table' )
 	type_assert( opts.index, 'nil', nil, true )
-	return redis.call( 'SMEMBERS', opts.index )
+	return redis.call('ZRANGE', opts.index, 0, -1 )
 end
 
 tools.index.add = function ( opts )
@@ -90,10 +87,9 @@ tools.index.add = function ( opts )
 	assert( type(opts) == 'table', badinput_msg("opts must be of type table") )
 	assert( not( type(opts['index']) == "nil"), badinput_msg("opts['index'] must be defined") )
 	assert( not(type(opts['value']) ==  "nil"), badinput_msg("opts['value'] must be defined") )
-
-	redis.call( 'sadd', opts['index'], opts['value'] )
-
-	return true
+	log( "index.add: adding " .. opts['value'] .. " to " .. opts['index'])
+	local resp = redis.call( 'ZADD', opts['index'], tonumber(opts['value']), opts['value'] )
+	return resp
 end
 
 tools.index.exists = function ( opts ) 
@@ -101,7 +97,8 @@ tools.index.exists = function ( opts )
 	assert( not(type(opts['index']) == "nil"), "opts['index'] must be defined" )
 	assert( not(type(opts['value']) ==  "nil"), "opts['value'] must be defined" )
 	local ret = true
-	if tonumber( redis.call( "SISMEMBER", opts['index'], opts['value'] ) ) == 0 then
+	local resp = redis.call( "ZRANK", opts['index'], opts['value'] ) 
+	if not resp then
 		ret = false
 	end
 	return ret
@@ -111,8 +108,9 @@ tools.index.del = function ( opts )
 	assert( type(opts) == 'table', "tools.index.del - opts must be of type table " .. debug.traceback() ) 
 	assert( not(type(opts['index']) == "nil"), "opts['index'] must be defined" )
 	assert( not(type(opts['value']) ==  "nil"), "opts['value'] must be defined" )
-	local ret = true
-	return tonumber( redis.call( "SREM", opts['index'], opts['value'] ) )
+	log( "Removing  ".. opts['value'].. " from " .. opts['index'] )
+	local res = tonumber( redis.call( "ZREM", opts['index'], opts['value'] ) )
+	log( "OK, removed")
 end
 
 tools.index.cross = function ( opts )
@@ -129,9 +127,9 @@ tools.index.cross = function ( opts )
 		assert( not(type(opts[i]['index']) == "nil"), badinput_msg("opts["..i.."]['index'] must be of type string") )
 		assert( not(type(opts[i]['value']) ==  "nil"), badinput_msg("opts["..i.."]['value'] must be of type string") )
 	end
-	--log( "tools.index.cross : crossing: " .. showtable( opts )) 
-	redis.call( 'sadd', opts[1]['index'], opts[2]['value'] )
-	redis.call( 'sadd', opts[2]['index'], opts[1]['value'] )
+	log( "tools.index.cross : crossing: " .. showtable( opts )) 
+	redis.call( 'ZADD', opts[1]['index'], tonumber(opts[2]['value'] ), opts[2]['value'] )
+	redis.call( 'ZADD', opts[2]['index'], tonumber(opts[1]['value'] ), opts[1]['value'] ) 
 	return true
 end
 
@@ -142,15 +140,14 @@ tools.index.uncross = function ( opts )
 		assert( not(type(opts[i]['index']) == "nil"), "opts["..i.."]['index'] must be of type string" )
 		assert( not(type(opts[i]['value']) ==  "nil"), "opts["..i.."]['value'] must be of type string" )
 	end
-	--log( "tools.index.cross : uncrossing: " .. showtable( opts ) ) 
-	redis.call( 'SREM', opts[1]['index'], opts[2]['value'] )
-	redis.call( 'SREM', opts[2]['index'], opts[1]['value'] )
+	log( "tools.index.cross : uncrossing: " .. showtable( opts ) ) 
+	redis.call( 'ZREM', opts[1]['index'], opts[2]['value'] )
+	redis.call( 'ZREM', opts[2]['index'], opts[1]['value'] )
 	return true
 end
 
 tools.arcnode = {}
 
-tools.arcs = {}
 
 tools.arcnode.create = function ( opts )
 	assert( type(opts) == 'table', 
@@ -158,6 +155,7 @@ tools.arcnode.create = function ( opts )
 	assert( type(opts.config) == 'table', 
 		"tools.arcnode.create: opts['config'] must be table" )
 	local config = opts.config
+	
 	local id = tools.index.next_id( { index=config.index } )
 	assert( not (type(id) == nil), "Failed to gain an ID!" )
 	--log( "Type of id is " .. type(id) )
@@ -197,23 +195,31 @@ tools.arcnode.delete = function( opts )
 		"Does not exist: " .. opts.config.name .. " id " 
 			..  opts.id 
 		)
+	log( "tools.arcnode.delete: removing from main index " .. opts.config.index )
 	tools.index.del( { index=opts.config.index, value=opts.id } )
 	for rel,ifunc in pairs( opts.config.each_indices ) do
 		for i,other in pairs( tools.index.all( {index=ifunc(opts.id)} ) ) do
+			log( "Uncrossing " 
+				.. ifunc(opts.id) .. "["..opts.id.."] and " 
+				.. tools[rel].config.each_indices[opts.config.name](other) 
+				.. "["..other.."]" 
+			)
 			tools.index.uncross( { 
 				{ index=ifunc(opts.id), value=opts.id },
 				{ index=tools[rel].config.each_indices[opts.config.name](other), value=other }
 			} )
 		end
-		--tools.logdel( ifunc(opts.id) )
+		tools.logdel( ifunc(opts.id) )
 	end
 	for i,tpl in pairs(opts.config.each_templates) do
-		--tools.logdel( tpl.genname( opts.id ) )
+		tools.logdel( tpl.genname( opts.id ) )
 	end
 	return opts.id
 end
 
 -- ARCS
+
+tools.arcs = {}
 
 tools.arcs.config = { 
 	name="arcs",
@@ -252,15 +258,15 @@ tools.arcs.create = function ( opts )
 	end
 	assert( not( opts.nodes[1] == opts.nodes[2] ), 
 		"tools.arcs.create: nodes must be different, not just {1=#"..opts.nodes[1]..",2="..opts.nodes[2].."}" )
-	for i,k in pairs( redis.call( 'smembers', tools.nodes.config.each_indices.arcs( opts.nodes[1])) ) do
-		assert( 0 == redis.call('sismember', tools.nodes.config.each_indices.arcs( opts.nodes[2] ), k), 
+	for i,k in pairs( redis.call( 'ZRANGE', tools.nodes.config.each_indices.arcs( opts.nodes[1]), 0, -1 ) ) do
+		assert( not redis.call('ZRANK', tools.nodes.config.each_indices.arcs( opts.nodes[2] ), k), 
 			" Arc " .. k .. " already joins  " .. 
-				showtable(redis.call('smembers', tools.arcs.config.each_indices.nodes( k ) ) ) 
+				showtable(redis.call('ZRANGE', tools.arcs.config.each_indices.nodes( k ),0,-1 ) ) 
 			.. " options are: " .. opts.nodes[1] .. " and ".. opts.nodes[2] .. "\n" .. 
 			  "found in " .. tools.nodes.config.each_indices.arcs( opts.nodes[1] ) ..  " " 
-			  .. showtable(redis.call( 'smembers', tools.nodes.config.each_indices.arcs( opts.nodes[1])) )
+			  .. showtable(redis.call( 'ZRANGE', tools.nodes.config.each_indices.arcs( opts.nodes[1]),0,-1) )
 			  .. " \n and \n" .. tools.nodes.config.each_indices.arcs( opts.nodes[2] ) ..  " " 
-			  .. showtable( redis.call('smembers', tools.nodes.config.each_indices.arcs( opts.nodes[2] ) ) ) 
+			  .. showtable( redis.call('ZRANGE', tools.nodes.config.each_indices.arcs( opts.nodes[2] ),0,-1 ) ) 
 			)
 		
 	end
@@ -282,19 +288,20 @@ tools.arcs.transfer = function( opts )
 	-- ensure the arc is accessible from the node
 	local current_node = tools.things.node( {id=opts.thing} )
 	local ismember=redis.call( 
-			"SISMEMBER", 
+			"ZRANK", 
 			tools.nodes.config.each_indices.arcs( current_node ),
 			opts.id -- this arc
 		)
-	redis.log(redis.LOG_NOTICE, "thing " .. opts.thing .." reach arc " .. opts.id .. " from " .. current_node .. "? Answer: " .. ismember )
-	assert( tonumber(ismember) > 0 ,
+	redis.log(redis.LOG_NOTICE, "thing " .. opts.thing .." reach arc " .. opts.id .. " from " .. current_node .. "? Answer: " .. tonumber(ismember) )
+	assert( ismember,
 		"thing " .. opts.thing .." cannot reach arc " .. opts.id
 	)
 	-- find target node 
 	local target_node = nil
 	for i,v in pairs( redis.call(
-		'SMEMBERS', 
-		tools.arcs.config.each_indices.nodes( opts.id )
+		'ZRANGE', 
+		tools.arcs.config.each_indices.nodes( opts.id ),
+		0, -1
 	) ) do
 		if not( v == current_node ) then
 			target_node = v
@@ -362,11 +369,11 @@ end
 tools.nodes.delete = function ( opts )
 	type_assert( opts, "table")
 	type_assert( opts.id, "nil", nil, true)
-	for i,v in pairs( redis.call( "SMEMBERS", tools.nodes.config.each_indices.things(opts.id)  ) ) do
+	for i,v in pairs( redis.call( "ZRANGE", tools.nodes.config.each_indices.things(opts.id),0,-1 ) ) do
 		assert( not( tools.things.exists( {id=v}) ), 
 			"Cannot delete node " .. opts.id .. " : inhabited by thing " .. v )
 	end
-	for i,v in pairs( redis.call( "SMEMBERS", tools.nodes.config.each_indices.arcs(opts.id)  ) ) do
+	for i,v in pairs( redis.call( "ZRANGE", tools.nodes.config.each_indices.arcs(opts.id),0,-1  ) ) do
 		assert( not( tools.arcs.exists( {id=v}) ), 
 			"Cannot delete node " .. opts.id .. " : connected by arc " .. v )
 	end
@@ -393,8 +400,9 @@ tools.things.config = {
 tools.things.node =function(opts)
 	tools.arcnode.std_assert(opts)
 	local nodes =redis.call( 
-		"SMEMBERS",
-		tools.things.config.each_indices.nodes( opts.id ) -- node of this thing
+		"ZRANGE",
+		tools.things.config.each_indices.nodes( opts.id ), -- node of this thing
+		0, -1
 	)
 	local node 
 	for i,v in pairs(nodes) do

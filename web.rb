@@ -13,16 +13,17 @@ helpers do
 		return request.accept? "application/json"
 	end
 
-	def exception_json e, msg = ""
-		status 500
-		JSON.pretty_generate	 Hash.new( 
-			"exception" => {
+	def exception_json e, msg = "", s=500
+		status s
+		content_type "application/json"
+		j=JSON.pretty_generate "exception" => {
 				"type" => e.class.name,
 				"message" => e.message.to_s,
 				"backtrace" => e.backtrace.to_a,
 			},
 			"message" => msg.to_s
-		)
+		$stderr.puts j
+		return j
 	end
 	def main_erb body 
 		if js 
@@ -70,28 +71,6 @@ helpers do
 	end
 end
 
-
-
-get "/nodes/:id/arcs" do
-	n = Node.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['arcs'].to_h : n['arcs'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
-get "/nodes/:id/things" do
-	n = Node.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['things'].to_h : n['things'] )
-	else
-		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
-	end
-end
-
 put "/arcs/:id/transfer/:thing" do
 	r = Redis.new
 	r.select 1
@@ -106,50 +85,99 @@ put "/arcs/:id/transfer/:thing" do
 	end
 end
 
-get "/arcs/:id/nodes" do
-	n = Arc.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['nodes'].to_h : n['nodes'] )
-	else
+def class_by_param param, type = ItemSet
+	c = Object.const_get( cname = param.capitalize )
+	raise TypeError.new( "Invalid set #{param} (converted to #{cname})"
+			) unless c.kind_of? Class and c < type
+	c
+end
+
+def obj_by_param param, type = Item
+	c = Object.const_get( cname = param.gsub(/s$/, '' ).capitalize )
+	raise TypeError.new( "Invalid object #{param} (converted to #{cname})"
+			) unless c.kind_of? Class and c < type
+	c
+end
+
+def start_and_finish cstart, cfinish, preurl
+	start = 0
+	span=9
+	finish = start + span
+	if cstart and cstart.to_i 
+		start = cstart.to_i
+		finish = start + span
+		s=true
+	end
+	if cfinish and cfinish.to_i and cfinish.to_i <= finish
+		finish = cfinish.to_i
+		f=true
+	end
+	preurl = "#{preurl}/" unless %r:/$: =~ preurl
+	suburl="#{start},#{finish}"
+	unless s and f # unless used captured (param) start and finish
+		return :status=>303, :url=>"#{preurl}/#{suburl}", :suburl=>suburl, :preurl=>preurl
+	end
+	return :status=>200, :start=>start,:finish=>finish, :preurl=>preurl, :suburl=>suburl
+end
+
+# view any viewable or subset
+get %r:^/([a-z]+)/(\d+)(/([a-z]+)(/(\d+),((\d+)/?)?)?)?$: do
+	ctype = 0
+	cid   = 1
+	csub = 3 
+	cstart=5
+	cfinish=7
+	begin 
+		c = obj_by_param params[:captures][ctype]
+		id = params[:captures][cid].to_i
+		n = c.new id
+		# if a subgroup, we need to handle paging there
+		if params[:captures][csub]
+			sub = params[:captures][csub]
+			preurl="/#{params[:captures][ctype]}/#{id}/#{sub}"
+			raise Exception.new "No such parameter: sub" unless n[sub]
+			raise TypeError.new( "parameter #{sub} is not listable ( unimplemented" 
+				) unless n[sub].kind_of? ItemSet
+			sf = start_and_finish params[:captures][cstart], params[:captures][cfinish], preurl
+			if sf[:status] == 303
+				redirect "/#{params[:captures][ctype]}/#{id}/"+
+					"#{params[:captures][csub]}/#{sf[:suburl]}", 303
+			else
+				erb = erb(:list, :locals=>{ 
+						:items=>n[sub].loadSome(sf[:start], sf[:finish]),
+						:sf=>sf
+				})
+			end
+		# no subgroup; we just apply 
+		else
+			erb = (js ? n.to_h : item_erb(n) )
+		end
+		main_erb erb 
+	rescue Exception=>e
 		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
+		exception_json( e, "Could not create class and view id #{id} of #{c.inspect}", 404 )
 	end
 end
 
-get "/nodes/:id" do
-	main_erb item_erb(params[:id], Node)
-end
-
-get "/nodes" do
-	main_erb list_erb(Nodes.new.loadAll)
-end
-
-get "/arcs/:id" do
-	main_erb item_erb(params[:id], Arc)
-end
-
-get "/arcs" do
-	main_erb erb( :list, :locals => { :items=>Arcs.new.loadAll } )
-end
-
-get "/things/:id/nodes" do
-	n = Thing.new(params[:id])
-	if n.loaded?
-		main_erb list_erb( js ? n['nodes'].to_h : n['nodes'] )
-	else
+# view any viewable set
+get %r{^/([a-z]+)(/((\d+),(\d+)?/?)?)?$} do
+	ctype = 0
+	cstart = 3
+	cfinish = 4
+	begin 
+		captures = params[:captures]
+		c = class_by_param params[:captures][ctype]
+		sf = start_and_finish captures[cstart], captures[cfinish], "/#{captures[ctype]}"
+		if sf[:status] == 303
+			url="/#{captures[ctype]}/#{sf[:suburl]}"
+			redirect url, 303
+		else	
+			main_erb erb( :list, :locals => { :items=>c.new.loadSome( sf[:start],sf[:finish] ), :sf=>sf} )
+		end
+	rescue Exception=>e
 		status 404
-		main_erb( item_erb( js ? n.to_h : n ) )
+		exception_json( e, "Could not create class and view of #{c.inspect}", 404 )
 	end
-end
-get %r{/things/(\d+)$} do
-	id = params[:captures][0]
-	main_erb item_erb(id, Thing)
-end
-
-get %r{/things(/(\d+),(\d+)?)?} do
-	content_type "application/json"
-	JSON.pretty_generate :captures=>params[:captures] , :request=>request.inspect
-	# main_erb erb( :list, :locals => { :items=>Things.new.loadSome } )
 end
 
 get "/" do
