@@ -39,11 +39,11 @@ helpers do
 		end
 	end
 
-	def list_erb itemset, subtitle=nil
+	def list_erb itemset, sf, subtitle=nil
 		if js 
 			itemset.to_h
 		else
-			erb :list, :locals=>{:items=>itemset}
+			erb :list, :locals=>{:items=>itemset,:sf=>sf}
 		end
 	end
 	def erb404 
@@ -115,7 +115,7 @@ def start_and_finish cstart, cfinish, preurl
 	preurl = "#{preurl}/" unless %r:/$: =~ preurl
 	suburl="#{start},#{finish}"
 	unless s and f # unless used captured (param) start and finish
-		return :status=>303, :url=>"#{preurl}/#{suburl}", :suburl=>suburl, :preurl=>preurl
+		return :status=>303, :url=>"#{preurl}/#{suburl}", :suburl=>suburl, :preurl=>preurl, :start=>start,:finish=>finish
 	end
 	return :status=>200, :start=>start,:finish=>finish, :preurl=>preurl, :suburl=>suburl
 end
@@ -184,8 +184,8 @@ get "/" do
 	main_erb erb( 
 		:index, 
 		:locals => {
-			:arcs =>   list_erb( Arcs.new.loadAll) ,
-			:nodes =>  list_erb( Nodes.new.loadAll) 
+			:arcs =>   list_erb( Arcs.new.loadSome( 0, 10), start_and_finish(0,10, "/arcs/")),
+			:nodes =>  list_erb( Nodes.new.loadSome( 0, 10), start_and_finish(0,10, "/nodes/")) 
 		}
 	)
 end
