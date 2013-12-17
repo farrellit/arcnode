@@ -12,31 +12,48 @@ unless item.loaded?
 	%><p><em>item is not bound to data </em> ( id: <code><%=id%></code>, item: <code<%= item.inspect %></code> ) </p><%
 else
 	others = Hash.new
+	pathables = Hash.new
 	item.to_h.each do |key,val|
-		
-		if item[key].kind_of? Pathable %>
-			<h4><%= item[key].path_html %></h4>
+		if item[key].kind_of? Pathable 
+			pathables[key] = val
+		else
+			others[key] = val	
+		end
+	end
+	%>
+	<div class='otherparameters'>
+	<h4>Other Parameters</h4>
+	<dl>
+	<% others.each do |key,val|
+		%><dt><%= key %></dt>
+		<dd><%= val.to_s %></dd>
+	<% end %>
+  </dl></div>
+  <%
+	if extra = item.view_extra
+	%><%= extra %><%
+	end
+	pathables.each do |key,val|
+		%>	<h4><%= item[key].path_html %></h4>
+			<%
+			fullcount=item[key].full_count
+			if fullcount < 3
+				item[key].loadAll
+			else
+				item[key].loadSome 0, 2
+			end
+			%><p>Showing <kbd><%=item[key].count %></kbd> of <kbd><a href='<%= item[key].path_url %>'><%= fullcount %></a></kbd>:</p>
 			<ul>
 			<% item[key].each do |ref,item| %>
 				<li>
 					<a class='Instance <%= item.class.name %>' href='<%= "#{item.path_url}" %>' ><%= item.link_text %></a>
 				</li>
 			<% end %>
-		</ul>
+		</ul></p>
 		<% 
-		else
-			others[key] = val	
-		end
 	end
-	%><h4>Other Parameters</h4>
-
-	<dl>
-	<% others.each do |key,val|
-		%><dt><%= key %></dt>
-		<dd><%= val.to_s %></dd>
-	<% end %>
-  </dl>
-<% end %>
+end %>
+<div style='height:0; clear: both;margin:0;padding:0'></div>
 </div>
 
 

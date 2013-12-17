@@ -26,6 +26,7 @@ body  div.Item > h3  {
 	Xborder-bottom-style: dotted;
 	padding: 4px;
 	margin: -13px;
+	margin-bottom: 4px;
 }
 
 a.Class, a.Instance,
@@ -102,4 +103,18 @@ dd {
 	margin-left: 1.1em;
 	padding-left: .2em;
 	border-left: dotted 1px;
+}
+
+div.otherparameters{
+	float: right;
+	background-color: rgba(255,255,255,0.63);
+	border: solid 1px;
+	padding: 3px;
+	margin: 3px;
+}
+
+div.otherparameters h4 {
+	background-color: white;
+	margin: -3px;
+	padding: 3px;
 }

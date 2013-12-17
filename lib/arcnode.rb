@@ -139,7 +139,7 @@ class Item < Pathable # Node or Arc
 		itemset = type.new
 		itemset.set_name = redis_key
 		itemset.path = self.path 
-		itemset.loadAll
+		#itemset.loadAll
 		@data[key] = itemset
 	end
 	def get_data_key 
@@ -156,21 +156,37 @@ class Item < Pathable # Node or Arc
 	def link_extra 
 		"<small><code>#{ Rack::Utils.escape_html(self.inspect)}"
 	end
+	def view_extra
+		nil
+	end
 end
 
 class Node < Item
 	def link_extra
 		arcs = ""
+		things = ""
 		acount = 0
-		@data['arcs'].each{ |id,arc| 
+		tcount = 0
+		@data['arcs'].loadAll.each{ |id,arc| 
 			arcs << " <a class='Arc' href='#{arc.link_url}'>#{id}</a>"
 			acount += 1
-			if acount > 9 and acount < ( @data['arcs'].count - 1 )
+			if acount > 9 and acount < ( @data['arcs'].full_count - 1 )
 				arcs << "<a href='#{@data['arcs'].path_url}' class='Arcs'>&hellip;</a> "
 				break
 			end 
 		}
-		"Connected by <a class='Arc' href='#{@data['arcs'].path_url}'>#{@data['arcs'].count} Arcs</a>: #{arcs}"
+		@data['things'].loadAll.each{ |id,thing| 
+			things << " <a class='Thing' href='#{thing.link_url}'>#{id}</a>"
+			tcount += 1
+			if tcount > 9 and tcount < ( @data['things'].full_count - 1 )
+				things << "<a href='#{@data['things'].path_url}' class='Things'>&hellip;</a> "
+				break
+			end 
+		}
+		arcs = "( #{arcs} )" if arcs.length > 0
+		things = "( #{things} )" if things.length > 0
+		"Connected by <a class='Arc' href='#{@data['arcs'].path_url}'>#{@data['arcs'].count} Arcs</a> #{arcs}
+		Inhabited by <a class='Thing' href='#{@data['things'].path_url}'>#{ @data['things'].full_count} things</a> #{things}" 
 	end
 	def load_data id
 		super
@@ -182,7 +198,7 @@ end
 class Arc < Item
 	def link_extra
 		nodes = ""
-		@data['nodes'].each{ |id,node| nodes << " <a href='#{node.link_url}'>#{id}</a> " }
+		@data['nodes'].loadAll.each{ |id,node| nodes << " <a href='#{node.link_url}'>#{id}</a> " }
 		"Connecting Nodes: #{nodes}"
 	end
 	def load_data id
@@ -192,17 +208,38 @@ class Arc < Item
 end
 
 class Thing < Item
+	def movement_links node=nil
+		nodes=""
+		list = {node.id=>node} if node
+		list = @data['nodes'].loadAll unless node
+		list.each{ |nid,node| 
+			node['arcs'].loadAll
+			if node['arcs'].count > 0
+				nodes << "<p>Move Through: <ul>" 
+				node['arcs'].each{ |id,arc|	
+					arc['nodes'].loadAll
+					other_node = nil
+					arc['nodes'].each_id do |oid|
+						other_node = Node.new( oid ) if oid != nid
+					end
+					nodes << " <li><a href='#' onclick='moveThing(\"#{@id}\",\"#{id}\");return false'>arc #{id}</a>"
+					nodes << " to <a href='#{other_node.link_url}'>node #{other_node.id}</i>" if other_node 
+					nodes << "</li>"
+				}
+				nodes << "</ul></p>" if node['arcs']
+			end
+		}
+		nodes
+	end
 	def link_extra
 		nodes = ""
-		@data['nodes'].each{ |id,node| 
-			nodes << " <a href='#{node.link_url}'>#{id}</a> "
-			nodes << "Move Through: " if node['arcs'].count > 0
-			node['arcs'].each{ |id,arc|
-				nodes << " <a href='#' onclick='moveThing(\"#{@id}\",\"#{id}\");return false'>arc #{id}</a>"
-			}
+		@data['nodes'].loadAll.each{ |id,node| 
+			nodes << " <a href='#{node.link_url}'>#{node.id}</a> #{movement_links node} "
 		}
 		"Habitating Node: #{nodes}"
-
+	end
+	def view_extra
+		"<h4>Movement Controls</h4><p>#{movement_links}</p>"
 	end
 	def load_data id
 		super
@@ -224,7 +261,6 @@ public
 		@subtitle = self.class.name
 	end
 	
-
 	def newobj id
 		@@cache ||= {}
 		@@cache[@set_name] ||= ExpCache.new :default_timeout=>10.0
@@ -279,6 +315,7 @@ public
 	end
 	
 	def loadSome start, finish
+		cachekey= "#{@set_name}/lastLoad/#{start},#{finish}"
 		start = start.to_i
 		finish = finish.to_i
 		@set.clear

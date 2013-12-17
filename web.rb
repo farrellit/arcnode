@@ -184,7 +184,7 @@ get "/" do
 	main_erb erb( 
 		:index, 
 		:locals => {
-			:arcs =>   list_erb( Arcs.new.loadSome( 0, 10), start_and_finish(0,10, "/arcs/")),
+			:arcs =>   list_erb( Arcs.new.loadSome( 0, 9), start_and_finish(0,9, "/arcs/")),
 			:nodes =>  list_erb( Nodes.new.loadSome( 0, 10), start_and_finish(0,10, "/nodes/")) 
 		}
 	)
