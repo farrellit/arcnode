@@ -5,6 +5,8 @@ require 'sinatra'
 require 'json'
 require './lib/arcnode.rb' 
 
+`cd scripts; ruby load.rb`
+
 helpers do
 	def h(text)
 		Rack::Utils.escape_html(text)

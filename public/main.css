@@ -10,15 +10,15 @@ body  div.Item {
 div.Arc {
 	background-color: #eeeeee;
 	border-left: dotted 3px #9f7;
-	background-color: #f3ffef;
+	background-color: #BCf46E;
 }
 div.Node {
 	border-left: dotted 3px #f97;
-	background-color: #fff3ef;
+	background-color: #EB6AA3;
 }
 div.Thing {
 	border-left: dotted 3px #ff7;
-	background-color: #ffffcc;
+	background-color: #F1FD72;
 }
 
 body  div.Item > h3  {
@@ -45,19 +45,19 @@ a.Class:hover, a.Instance:hover
 }
 body div.Node > h3 {
 	xborder-bottom: dotted 3px #f97;
-	background-color: #ffe9e1;
+	xbackground-color: #ffe9e1;
 }
 
 a.Node, a.Nodes {
-	border-bottom-color: #f97;
+	xborder-bottom-color: #f97;
 }
 div.Arc > h3{
 	xborder-bottom: dotted 3px #9f7;
-	background-color: #e9ffe1;
+	xbackground-color: #e9ffe1;
 }
 
 a.Arc, a.Arcs {
-	border-bottom-color: #9f7;
+	xborder-bottom-color: #9f7;
 }
 
 code, pre {
