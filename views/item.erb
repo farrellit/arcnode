@@ -37,10 +37,10 @@ else
 		%>	<h4><%= item[key].path_html %></h4>
 			<%
 			fullcount=item[key].full_count
-			if fullcount < 3
+			if fullcount <= 6
 				item[key].loadAll
 			else
-				item[key].loadSome 0, 2
+				item[key].loadSome 0, 4
 			end
 			%><p>Showing <kbd><%=item[key].count %></kbd> of <kbd><a href='<%= item[key].path_url %>'><%= fullcount %></a></kbd>:</p>
 			<ul>

@@ -1,0 +1,87 @@
+
+how to make use of opposing forces to add some dynamism to the world - and
+hopefully, some chaos.  
+
+mathematical functions with interesting relative characteristics is a key
+component to this chaos.  
+
+With the right set of functions, any known domain ( or domains, for different
+functions ) can map to an all-encompassing range - but more importantly, local maximums between functions can be the source of significan dynamism over that range.
+
+For example, say arcs have a 'passability' that decreases with travel through
+the arc, but regenerates with time, from 0 to 1.  The force required to pass
+through the arc would be low at high passability, and low at lower
+passabilities - a loose function of historical travel activity and current
+conditions.  
+
+Similarly, the force propelling a thing trough the arc would be infinite at
+complete density, and infintesimal at complete emptiness - a concept that maps
+itself easily to graph analysis.
+
+If tuned properly, these functions together would provide a dynamic system
+that would continue to adjust with inter-node travel.
+
+Any dynamic system might include huge pools of stagnation - and indeed, only a
+failrly small portion of most fractals, typically along "boundaries", tend to
+be fascinatingly complex.  The tric is to control the domain _and_ range of
+the chosen functions so that stagnation in itself can provide a source of
+dynamism - of "feedback", as it were.
+
+Other concepts:
+
+simple game mechanics might be adapted for interactions between active
+inhabitants; motivations described by carefully tuned functions would provide
+some impetus to choose strategies more aggressive or defensive.
+
+Intergenerational continuity is an interesting topic.  Genetic inheritance
+does't necessarily imply, nor disallow, the passage of behavioral traits.  We
+perhaps think of traits being passed down that are more easily observed in
+genetic expression - but values within genetic material could just as easily
+provide small adjustments to otherwise static functions, providing in place of
+a "works or doesn't" kind of genetic material (the sort typically found in
+computerized natural evolution engines), values that are valid for a
+continuous domain.
+
+traits we're used to find interesting are irrelevant and in fact don't exist.
+Color has no obvious analogue, though we think of camoflauge  as one of the
+most primary evolutionary evidence.  
+
+But we can _invent_ any attributes we can imagine and implement.  We have the
+ability to create size without much difficulty - having obvious implications
+on inter-node travel, as well as easily imagined effects on game dynamics
+between things.
+
+what about speed?  Possibly not speed of movement - so far it seems that there
+isn't continuous enough world locality for that to be a continuous value;
+whether there is a good way to "timeout" a transit by an object is a good
+question.  Expire values in redis might provide a good timeout , but how to
+guarantee reliability and fairness alludes me.  Once could enqueue movements
+to guarantee fairness ... maybe a sorted set ordered by some sort of timeout
+value to find the soonest expiry, or perhaps even an intelligent queue
+insertion process that could insert a new item midway though a list.  
+
+actually, that would work quite well.  A sorted set would guarantee uniqueness
+and a lua script could be used to guarantee pop order.  It's actually quite
+simple - a value is the id of a thing needing a chance to act, and the score
+would be the time at which the current action would be done.  This score would
+allow for fairness.  Since LUA scripts are atomic, they provide a good
+mechanism for codifying this.
+
+it seems like a good solution, and the problem will have to be solved if
+objects are not just driftwood tossed upon the sea, but rather fishes swimming
+through it.  
+
+
+Let the goals then be thus:
+
+* provide transit rules and limits.  
+	Find parameters that can change with time and can help to define a
+	'passive' dynamism.
+
+* provide inter-thing dynamics and start to explore 
+	motivational functions of discretionary activity.
+
+* provide a system to enqueue and process discretionary activity 
+	fairly and reasonably accurately.
+
+
